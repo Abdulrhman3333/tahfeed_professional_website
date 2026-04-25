@@ -52,6 +52,7 @@
                 <thead class="table-dark">
                     <tr>
                         <th>اسم الطالب</th>
+                        <th>حلقة الاختبار</th>
                         <th>الجزء المراد اختباره</th>
                         <th>درجة المعلم</th>
                         <th>درجة الاختبار الداخلي</th>
@@ -64,6 +65,17 @@
                     {% for item in nominations %}
                     <tr>
                         <td>{{ item.nomination.student.full_name }}</td>
+                        <td>
+                            <select name="exam_halaqa_teacher_{{ item.nomination.id }}" class="form-select">
+                                <option value="">اختر الحلقة</option>
+                                {% for halaqa_profile in halaqa_profiles %}
+                                <option value="{{ halaqa_profile.user_id }}"
+                                        {% if item.nomination.exam_halaqa_teacher_id == halaqa_profile.user_id %}selected{% endif %}>
+                                    {{ halaqa_profile.class_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </td>
                         <td><span class="badge bg-success">{{ item.next_part }}</span></td>
                         <td><span class="badge bg-info">{{ item.nomination.teacher_grade|floatformat:2 }}</span></td>
                         <td><span class="badge bg-info">{{ item.nomination.internal_grade|floatformat:2 }}</span></td>

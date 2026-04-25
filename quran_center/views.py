@@ -5,7 +5,7 @@ from django.conf import settings
 from .forms import StudentRegistrationForm, StudentBulkUploadForm, MemorizationTemplateUploadForm
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.views import LoginView
-from .models import Student, Attendance, TeacherAttendance, StageSupervisor, AcademicCalendar, ExamNomination, UserRole, TeacherPlanPreference, SmsTemplateSetting, MemorizationTemplateBundle
+from .models import Student, Attendance, TeacherAttendance, StageSupervisor, AcademicCalendar, ExamNomination, UserRole, TeacherPlanPreference, SmsTemplateSetting, MemorizationTemplateBundle, TeacherProfile
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.db.models import Count, Q, Max
@@ -1303,7 +1303,7 @@ def nominated_students(request):
     if not user_has_role(request.user, 'examiner'):
         return redirect('home')
 
-    nominations = ExamNomination.objects.filter(internal_passed=False).select_related('student').order_by('student__full_name', '-id')
+    nominations = ExamNomination.objects.filter(internal_passed=False).select_related('student', 'teacher').order_by('student__full_name', '-id')
     
     if request.method == 'POST':
         for nomination in nominations:
@@ -1323,8 +1323,42 @@ def nominated_students(request):
             'nomination': nomination,
             'next_part': nomination.get_next_part()
         })
-    
-    return render(request, 'nominated_students.html', {'nominations': nominations_with_next})
+
+    mae_source = ExamNomination.objects.filter(
+        teacher_grade__isnull=False,
+        internal_grade__isnull=False,
+    ).select_related('teacher')
+
+    mae_map = {}
+    for nomination in mae_source:
+        teacher = nomination.teacher
+        if teacher.id not in mae_map:
+            mae_map[teacher.id] = {
+                'teacher_name': teacher.get_full_name() or teacher.username,
+                'sum_abs_error': 0.0,
+                'count': 0,
+            }
+
+        abs_error = abs(float(nomination.teacher_grade) - float(nomination.internal_grade))
+        mae_map[teacher.id]['sum_abs_error'] += abs_error
+        mae_map[teacher.id]['count'] += 1
+
+    teacher_mae_rows = []
+    for item in mae_map.values():
+        count = item['count']
+        mae_value = item['sum_abs_error'] / count if count else 0.0
+        teacher_mae_rows.append({
+            'teacher_name': item['teacher_name'],
+            'samples_count': count,
+            'mae': mae_value,
+        })
+
+    teacher_mae_rows.sort(key=lambda row: row['mae'])
+
+    return render(request, 'nominated_students.html', {
+        'nominations': nominations_with_next,
+        'teacher_mae_rows': teacher_mae_rows,
+    })
 
 
 @login_required
@@ -1333,7 +1367,14 @@ def association_candidates(request):
     if not user_has_role(request.user, 'examiner'):
         return redirect('home')
 
-    nominations = ExamNomination.objects.filter(internal_passed=True, association_tested=False).select_related('student').order_by('student__full_name', '-id')
+    nominations = ExamNomination.objects.filter(internal_passed=True, association_tested=False).select_related('student', 'exam_halaqa_teacher').order_by('student__full_name', '-id')
+
+    halaqa_profiles = TeacherProfile.objects.filter(
+        class_name__isnull=False
+    ).exclude(
+        class_name__exact=''
+    ).select_related('user').order_by('class_name', 'user__username')
+    halaqa_teacher_ids = {profile.user_id for profile in halaqa_profiles}
 
     default_sms_template = (
         "السلام عليكم ورحمة الله وبركاته\n\n"
@@ -1416,11 +1457,23 @@ def association_candidates(request):
 
         else:
             for nomination in nominations:
+                exam_halaqa_teacher_raw = (request.POST.get(f'exam_halaqa_teacher_{nomination.id}') or '').strip()
+                if exam_halaqa_teacher_raw:
+                    try:
+                        selected_halaqa_teacher_id = int(exam_halaqa_teacher_raw)
+                    except ValueError:
+                        selected_halaqa_teacher_id = None
+                    if selected_halaqa_teacher_id not in halaqa_teacher_ids:
+                        selected_halaqa_teacher_id = None
+                else:
+                    selected_halaqa_teacher_id = None
+
+                nomination.exam_halaqa_teacher_id = selected_halaqa_teacher_id
                 association_grade = request.POST.get(f'association_grade_{nomination.id}')
                 if association_grade:
                     nomination.association_grade = association_grade
                     nomination.association_tested = True
-                    nomination.save()
+                nomination.save()
             return redirect('association_candidates')
 
     nominations_with_next = []
@@ -1432,6 +1485,7 @@ def association_candidates(request):
 
     return render(request, 'association_candidates.html', {
         'nominations': nominations_with_next,
+        'halaqa_profiles': halaqa_profiles,
         'association_sms_template': association_sms_template,
         'sms_feedback': sms_feedback,
         'template_save_feedback': template_save_feedback,

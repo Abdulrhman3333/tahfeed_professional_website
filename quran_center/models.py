@@ -244,6 +244,14 @@ class ExamNomination(models.Model):
     """ترشيح الطالب للاختبار الداخلي"""
     student = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="الطالب")
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="المعلم المرشح")
+    exam_halaqa_teacher = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='association_exam_halaqa_nominations',
+        verbose_name="اسم حلقة الاختبار"
+    )
     last_tested_part = models.CharField(
         max_length=50,
         choices=LAST_TESTED_PART_CHOICES,
@@ -279,6 +287,8 @@ class ExamNomination(models.Model):
 class TeacherProfile(models.Model):
     """ملف تعريفي للمعلم يحتوي على معلومات إضافية"""
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="المستخدم", related_name='teacher_profile')
+    class_name = models.CharField(max_length=120, verbose_name="اسم الحلقة", blank=True, null=True)
+    halaqa_name = models.CharField(max_length=120, verbose_name="اسم الحلقة (بديل)", blank=True, null=True)
     phone = models.CharField(max_length=15, verbose_name="رقم الجوال", blank=True, null=True)
     
     class Meta:

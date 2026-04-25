@@ -19,6 +19,7 @@
                 <thead class="table-dark">
                     <tr>
                         <th>اسم الطالب</th>
+                        <th>اسم المعلم</th>
                         <th>الجزء المراد اختباره</th>
                         <th>درجة المعلم</th>
                         <th>درجة الاختبار الداخلي</th>
@@ -29,6 +30,7 @@
                     {% for item in nominations %}
                     <tr>
                         <td>{{ item.nomination.student.full_name }}</td>
+                        <td>{{ item.nomination.teacher.get_full_name|default:item.nomination.teacher.username }}</td>
                         <td><span class="badge bg-success">{{ item.next_part }}</span></td>
                         <td><span class="badge bg-info">{{ item.nomination.teacher_grade|floatformat:2 }}</span></td>
                         <td>
@@ -67,6 +69,36 @@
         لا يوجد مرشحون للاختبار حالياً.
     </div>
     {% endif %}
+
+    <div class="card mt-4">
+        <div class="card-header bg-dark text-white">متوسط الخطأ المطلق MAE لكل معلم (المتوقع مقابل الداخلي)</div>
+        <div class="card-body">
+            {% if teacher_mae_rows %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>اسم المعلم</th>
+                            <th>عدد العينات</th>
+                            <th>MAE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in teacher_mae_rows %}
+                        <tr>
+                            <td>{{ row.teacher_name }}</td>
+                            <td>{{ row.samples_count }}</td>
+                            <td><span class="badge bg-secondary">{{ row.mae|floatformat:2 }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info mb-0">لا توجد بيانات كافية لحساب MAE حتى الآن.</div>
+            {% endif %}
+        </div>
+    </div>
     
     <div class="mt-3">
         <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary">العودة للوحة التحكم</a>
