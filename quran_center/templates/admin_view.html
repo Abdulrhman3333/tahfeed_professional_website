@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}لوحة تحكم المدير{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">لوحة تحكم المدير</h1>
+        <p class="page-hero-subtitle">إدارة سريعة للطلاب والتحضير والإدارة</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+    
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card text-center mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5>الطلاب المنتظرين</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'pending_students' %}" class="btn btn-primary">عرض الطلاب المنتظرين</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card text-center mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5>التحضير</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'take_attendance' %}" class="btn btn-success">التحضير اليومي</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card text-center mb-3">
+                <div class="card-header bg-warning text-dark">
+                    <h5>إدارة النظام</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'admin:index' %}" class="btn btn-warning">لوحة Django Admin</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

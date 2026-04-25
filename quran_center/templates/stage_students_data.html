@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">إحصائية غياب طلاب المرحلة</h1>
+        <p class="page-hero-subtitle">{% if current_stage %}مرحلة {{ current_stage }}{% else %}جميع المراحل{% endif %}</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+
+    <div class="card mb-4">
+        <div class="card-header bg-light">فلترة الإحصائية حسب التاريخ</div>
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">من تاريخ</label>
+                    <input type="date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">إلى تاريخ</label>
+                    <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">تطبيق الفلتر</button>
+                    <a href="{% url 'stage_students_data' %}" class="btn btn-outline-secondary">إلغاء</a>
+                </div>
+            </form>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <button type="button" class="btn btn-outline-primary" onclick="copyStageStudentNames()">نسخ أسماء جميع طلاب المرحلة</button>
+            </div>
+            <div class="alert alert-info mt-3 mb-0 py-2">
+                النطاق الافتراضي عند فتح الصفحة هو من يوم الأحد إلى يوم الخميس من الأسبوع الحالي،
+                والترتيب يكون من الأكثر غياباً إلى الأقل.
+            </div>
+        </div>
+    </div>
+    
+    <!-- Desktop Table View -->
+    <div class="table-responsive d-none d-md-block">
+        <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>اسم الطالب</th>
+                    <th>المعلم</th>
+                    <th>جوال ولي الأمر</th>
+                    <th>جوال الطالب</th>
+                    <th>الحي</th>
+                    <th>آخر جزء</th>
+                    <th>عدد الغياب</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.full_name }}</td>
+                    <td>
+                        <form method="post" style="display:inline;" id="form_{{ student.id }}">
+                            {% csrf_token %}
+                            <input type="hidden" name="student_id" value="{{ student.id }}">
+                            <select name="teacher_id" class="form-select form-select-sm" style="width: 100%;" onchange="document.getElementById('form_{{ student.id }}').submit();">
+                                <option value="">-- اختر المعلم --</option>
+                                {% for teacher in teachers %}
+                                <option value="{{ teacher.id }}" {% if student.teacher.id == teacher.id %}selected{% endif %}>{{ teacher.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </td>
+                    <td class="text-success">{{ student.parent_phone|default:"-" }}</td>
+                    <td class="text-success">{{ student.student_phone|default:"-" }}</td>
+                    <td>{{ student.neighborhood|default:"-" }}</td>
+                    <td>
+                        <span class="badge bg-primary">{{ student.get_last_tested_part_display|default:"-" }}</span>
+                    </td>
+                    <td><span class="badge bg-danger">{{ student.absent_count_in_range|default:0 }}</span></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center">لا يوجد طلاب في هذه المرحلة حالياً.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Mobile Card View -->
+    <div class="d-md-none">
+        {% for student in students %}
+        <div class="card mb-3 mobile-student-card">
+            <div class="card-body">
+                <h6 class="card-title text-primary fw-bold mb-3">{{ student.full_name }}</h6>
+                
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <small class="text-muted d-block">المعلم</small>
+                        <strong>{{ student.teacher.username|default:"-" }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">الحي</small>
+                        <strong>{{ student.neighborhood|default:"-" }}</strong>
+                    </div>
+                </div>
+
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <small class="text-muted d-block">آخر جزء</small>
+                        <strong><span class="badge bg-primary">{{ student.get_last_tested_part_display|default:"-" }}</span></strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">عدد الغياب</small>
+                        <strong><span class="badge bg-danger">{{ student.absent_count_in_range|default:0 }}</span></strong>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <small class="text-muted d-block">جوال ولي الأمر</small>
+                        <strong class="text-success">{{ student.parent_phone|default:"-" }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">جوال الطالب</small>
+                        <strong class="text-success">{{ student.student_phone|default:"-" }}</strong>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small text-muted">تغيير المعلم</label>
+                    <form method="post" id="form_mobile_{{ student.id }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="student_id" value="{{ student.id }}">
+                        <select name="teacher_id" class="form-select form-select-sm mb-2" onchange="document.getElementById('form_mobile_{{ student.id }}').submit();">
+                            <option value="">-- اختر المعلم --</option>
+                            {% for teacher in teachers %}
+                            <option value="{{ teacher.id }}" {% if student.teacher.id == teacher.id %}selected{% endif %}>{{ teacher.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+
+                <a href="{% url 'teacher_students_data' %}" class="btn btn-sm btn-info w-100">عرض البيانات</a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="alert alert-info text-center" role="alert">
+            لا يوجد طلاب في هذه المرحلة حالياً.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+@media (max-width: 767px) {
+    .mobile-student-card {
+        border-right: 4px solid #5B8FBE;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .mobile-student-card .card-body {
+        padding: 1.2rem;
+    }
+}
+</style>
+
+<textarea id="stageStudentsNamesText" style="position:absolute; left:-9999px; top:0; opacity:0;" aria-hidden="true">{% for student in students %}{{ student.full_name }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+
+<script>
+function copyStageStudentNames() {
+    const source = document.getElementById('stageStudentsNamesText');
+    if (!source) return;
+
+    const text = (source.value || '').trim();
+    if (!text) {
+        alert('لا توجد أسماء متاحة للنسخ.');
+        return;
+    }
+
+    navigator.clipboard.writeText(text)
+        .then(() => alert('تم نسخ أسماء جميع طلاب المرحلة بنجاح.'))
+        .catch(() => alert('تعذر نسخ الأسماء تلقائياً.'));
+}
+</script>
+{% endblock %}

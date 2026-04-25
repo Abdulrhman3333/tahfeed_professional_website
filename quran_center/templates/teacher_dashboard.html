@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}لوحة تحكم المعلم{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">احصائية الغياب</h1>
+        <p class="page-hero-subtitle">إحصائيات الحضور والمتابعة اليومية</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+
+    <div class="card mb-4">
+        <div class="card-header bg-light">فلترة الإحصائية حسب التاريخ</div>
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">من تاريخ</label>
+                    <input type="date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">إلى تاريخ</label>
+                    <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">تطبيق الفلتر</button>
+                    <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary">إلغاء</a>
+                </div>
+            </form>
+            <small class="text-muted d-block mt-2">يتم ترتيب الطلاب تلقائياً من الأكثر غياباً إلى الأقل ضمن النطاق المحدد.</small>
+        </div>
+    </div>
+   
+    <!-- إحصائيات عامة -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">إجمالي الطلاب</h5>
+                    <h2>{{ total_students }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- إحصائيات الحضور لكل طالب -->
+    <h3 class="mb-3">إحصائيات الحضور {% if start_date or end_date %}(ضمن النطاق المحدد){% else %}(كامل الفترة){% endif %}</h3>
+    
+    {% if attendance_stats %}
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>اسم الطالب</th>
+                    <th>إجمالي الأيام</th>
+                    <th>حاضر</th>
+                    <th>غائب</th>
+                    <th>غياب بعذر</th>
+                    <th>منصرف</th>
+                    <th>متأخر</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student_id, stats in attendance_stats.items %}
+                <tr>
+                    <td>{{ stats.student.full_name }}</td>
+                    <td><span class="badge bg-secondary">{{ stats.total_days }}</span></td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-success p-1" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modal_present{{ student_id }}"
+                                style="border: none; background-color: #198754; color: white; cursor: pointer;">
+                            {{ stats.present }}
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger p-1" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modal_absent{{ student_id }}"
+                                style="border: none; background-color: #dc3545; color: white; cursor: pointer;">
+                            {{ stats.absent }}
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-dark p-1" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modal_absent_excused{{ student_id }}"
+                                style="border: none; background-color: #212529; color: white; cursor: pointer;">
+                            {{ stats.absent_excused }}
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-warning p-1" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modal_excused{{ student_id }}"
+                                style="border: none; background-color: #ffc107; color: black; cursor: pointer;">
+                            {{ stats.excused }}
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-info p-1" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modal_late{{ student_id }}"
+                                style="border: none; background-color: #0dcaf0; color: black; cursor: pointer;">
+                            {{ stats.late }}
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- جميع Modals خارج الجدول -->
+        {% for student_id, stats in attendance_stats.items %}
+                    <!-- Modal لتعديل أيام الحضور -->
+                    <div class="modal fade" id="modal_present{{ student_id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="post" action="{% url 'update_attendance' %}">
+                                    {% csrf_token %}
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">أيام الحضور - {{ stats.student.full_name }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>التاريخ</th>
+                                                        <th>الحالة</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for record in stats.all_attendance %}
+                                                        {% if record.status == 'حاضر' %}
+                                                        <tr>
+                                                            <td>{{ record.date|date:"Y/m/d" }}</td>
+                                                            <td>
+                                                                <select name="status_{{ record.date|date:'Y-m-d' }}_{{ student_id }}" class="form-select form-select-sm">
+                                                                    <option value="حاضر" selected>حاضر</option>
+                                                                    <option value="غائب">غائب</option>
+                                                                    <option value="غياب بعذر">غياب بعذر</option>
+                                                                    <option value="مستأذن">منصرف</option>
+                                                                    <option value="متأخر">متأخر</option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                                        <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Modal لتعديل أيام الغياب -->
+                    <div class="modal fade" id="modal_absent{{ student_id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="post" action="{% url 'update_attendance' %}">
+                                    {% csrf_token %}
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">أيام الغياب - {{ stats.student.full_name }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>التاريخ</th>
+                                                        <th>الحالة</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for record in stats.all_attendance %}
+                                                        {% if record.status == 'غائب' %}
+                                                        <tr>
+                                                            <td>{{ record.date|date:"Y/m/d" }}</td>
+                                                            <td>
+                                                                <select name="status_{{ record.date|date:'Y-m-d' }}_{{ student_id }}" class="form-select form-select-sm">
+                                                                    <option value="حاضر">حاضر</option>
+                                                                    <option value="غائب" selected>غائب</option>
+                                                                    <option value="غياب بعذر">غياب بعذر</option>
+                                                                    <option value="مستأذن">منصرف</option>
+                                                                    <option value="متأخر">متأخر</option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                                        <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal لتعديل أيام الغياب بعذر -->
+                    <div class="modal fade" id="modal_absent_excused{{ student_id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="post" action="{% url 'update_attendance' %}">
+                                    {% csrf_token %}
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">أيام الغياب بعذر - {{ stats.student.full_name }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>التاريخ</th>
+                                                        <th>الحالة</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for record in stats.all_attendance %}
+                                                        {% if record.status == 'غياب بعذر' %}
+                                                        <tr>
+                                                            <td>{{ record.date|date:"Y/m/d" }}</td>
+                                                            <td>
+                                                                <select name="status_{{ record.date|date:'Y-m-d' }}_{{ student_id }}" class="form-select form-select-sm">
+                                                                    <option value="حاضر">حاضر</option>
+                                                                    <option value="غائب">غائب</option>
+                                                                    <option value="غياب بعذر" selected>غياب بعذر</option>
+                                                                    <option value="مستأذن">منصرف</option>
+                                                                    <option value="متأخر">متأخر</option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                                        <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Modal لتعديل أيام الانصراف -->
+                    <div class="modal fade" id="modal_excused{{ student_id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="post" action="{% url 'update_attendance' %}">
+                                    {% csrf_token %}
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">أيام الانصراف - {{ stats.student.full_name }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>التاريخ</th>
+                                                        <th>الحالة</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for record in stats.all_attendance %}
+                                                        {% if record.status == 'مستأذن' %}
+                                                        <tr>
+                                                            <td>{{ record.date|date:"Y/m/d" }}</td>
+                                                            <td>
+                                                                <select name="status_{{ record.date|date:'Y-m-d' }}_{{ student_id }}" class="form-select form-select-sm">
+                                                                    <option value="حاضر">حاضر</option>
+                                                                    <option value="غائب">غائب</option>
+                                                                    <option value="غياب بعذر">غياب بعذر</option>
+                                                                    <option value="مستأذن" selected>منصرف</option>
+                                                                    <option value="متأخر">متأخر</option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                                        <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Modal لتعديل أيام التأخير -->
+                    <div class="modal fade" id="modal_late{{ student_id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="post" action="{% url 'update_attendance' %}">
+                                    {% csrf_token %}
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">أيام التأخير - {{ stats.student.full_name }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>التاريخ</th>
+                                                        <th>الحالة</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for record in stats.all_attendance %}
+                                                        {% if record.status == 'متأخر' %}
+                                                        <tr>
+                                                            <td>{{ record.date|date:"Y/m/d" }}</td>
+                                                            <td>
+                                                                <select name="status_{{ record.date|date:'Y-m-d' }}_{{ student_id }}" class="form-select form-select-sm">
+                                                                    <option value="حاضر">حاضر</option>
+                                                                    <option value="غائب">غائب</option>
+                                                                    <option value="غياب بعذر">غياب بعذر</option>
+                                                                    <option value="مستأذن">منصرف</option>
+                                                                    <option value="متأخر" selected>متأخر</option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                                        <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+        {% endfor %}
+    
+    {% else %}
+    <div class="alert alert-info">
+        لا توجد بيانات حضور لعرضها حالياً.
+    </div>
+    {% endif %}
+    
+</div>
+{% endblock %}

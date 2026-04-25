@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}تسجيل دخول المعلمين{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <img src="{% static 'images/logo.jpg' %}" alt="شعار جامع الحمودي" class="logo-circle" style="object-fit: contain; width: 96px; height: 96px;">
+        <h1 class="page-hero-title">تسجيل دخول المعلمين</h1>
+        <p class="page-hero-subtitle">حلقات جامع الحمودي • منصة التحضير وإدارة الحلقات</p>
+    </div>
+</div>
+
+<div class="row justify-content-center" dir="rtl">
+    <div class="col-lg-6">
+        <div class="card" style="border-top: 4px solid #5B8FBE;">
+            <div class="card-body">
+                {% if form.errors %}
+                    <div class="alert alert-danger">
+                        اسم المستخدم أو كلمة المرور غير صحيحة.
+                    </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label">اسم المستخدم</label>
+                        <input type="text" name="username" class="form-control" id="id_username" placeholder="ادخل اسم المستخدم" value="{{ form.username.value|default:remembered_username }}" autocomplete="username" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_password" class="form-label">كلمة المرور</label>
+                        <input type="password" name="password" class="form-control" id="id_password" placeholder="ادخل كلمة المرور" autocomplete="current-password" required>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" value="on" id="remember_me" name="remember_me" {% if remembered_username %}checked{% endif %}>
+                        <label class="form-check-label" for="remember_me">تذكرني في هذا الجهاز</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">تسجيل الدخول</button>
+                    <input type="hidden" name="next" value="{{ next }}">
+                </form>
+
+                <div class="text-center text-muted" style="margin-top: 1.25rem; font-size: 0.95rem;">
+                    في حال وجود مشكلة في الدخول تواصل مع إدارة الحلقات
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

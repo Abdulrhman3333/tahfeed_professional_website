@@ -1,0 +1,597 @@
+{% extends "base.html" %}
+{% load static role_tags %}
+{% block title %}خطة الطالب{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">إنشاء خطة طالب</h1>
+        <p class="page-hero-subtitle">{{ student.full_name }} - رقم {{ student.student_unique_id }}</p>
+    </div>
+</div>
+
+{# ─── Scoped styles ─── #}
+<style>
+:root {
+    --pg-primary: #1E5AA8;
+    --pg-primary-light: #58A6FF;
+    --pg-accent: #2B7ED7;
+    --pg-bg: #F4F8FF;
+    --pg-surface: #FFFFFF;
+    --pg-text: #1F3652;
+    --pg-border: #C9D9EE;
+    --pg-shadow: rgba(30, 90, 168, 0.12);
+}
+
+.plan-card {
+    background: var(--pg-surface);
+    border: 1px solid var(--pg-border);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px var(--pg-shadow);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.plan-card-header {
+    background: linear-gradient(135deg, var(--pg-primary) 0%, var(--pg-primary-light) 100%);
+    color: white;
+    padding: 1.4rem 1.6rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.plan-card-logo {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.15);
+    padding: 5px;
+    flex-shrink: 0;
+}
+
+.plan-card-header-text { flex: 1; text-align: center; }
+.plan-card-header h2  { font-size: 1.35rem; font-weight: 700; margin: 0 0 0.2rem 0; }
+.plan-card-header p   { font-size: 0.9rem; opacity: 0.92; margin: 0; }
+
+.plan-card-body { padding: 1.4rem 1.6rem; background: var(--pg-bg); }
+
+.pg-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+}
+
+.pg-form-group label {
+    font-weight: 700;
+    color: var(--pg-primary);
+    font-size: 0.88rem;
+    text-align: right;
+}
+
+.pg-form-group select,
+.pg-form-group input[type="number"] {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border: 2px solid var(--pg-border);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    background: white;
+    color: var(--pg-text);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    direction: rtl;
+}
+
+.pg-form-group select:focus,
+.pg-form-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--pg-primary);
+    box-shadow: 0 0 0 3px rgba(30, 90, 168, 0.14);
+}
+
+.pg-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    direction: rtl;
+    margin-bottom: 1rem;
+    background: white;
+    border: 2px solid var(--pg-border);
+    border-radius: 10px;
+    padding: 0.65rem 0.85rem;
+}
+
+.pg-checkbox-row label {
+    font-weight: 700;
+    color: var(--pg-primary);
+    font-size: 0.88rem;
+    cursor: pointer;
+    flex: 1;
+}
+
+#reviewOnlyCheck {
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    accent-color: var(--pg-primary);
+}
+
+.plan-actions { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.4rem; }
+
+.plan-actions .btn {
+    width: 100%;
+    padding: 0.85rem 1.5rem;
+    border: none;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-pg-primary {
+    background: linear-gradient(135deg, var(--pg-primary) 0%, var(--pg-primary-light) 100%);
+    color: white;
+}
+.btn-pg-primary:hover  { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(30,90,168,0.35); }
+.btn-pg-primary:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+
+.btn-pg-secondary {
+    background: linear-gradient(135deg, var(--pg-accent) 0%, var(--pg-primary-light) 100%);
+    color: white;
+}
+.btn-pg-secondary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(43,126,215,0.35); }
+
+.plan-back-row { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+
+.pg-divider {
+    border: 0;
+    border-top: 1px solid var(--pg-border);
+    margin: 1.2rem 0;
+}
+
+/* ─── PDF container ─── */
+#pdfContainer {
+    display: none;
+    visibility: hidden;
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    width: 210mm;
+    background: white;
+    padding: 10mm;
+}
+
+.pdf-page { display: none; background: white; padding: 8px; margin: 0; }
+.pdf-page.active { display: block; page-break-after: always; }
+
+.pdf-header {
+    text-align: center;
+    margin-bottom: 4px;
+    padding: 6px 8px 4px;
+    border-bottom: 2px solid #1E5AA8;
+    position: relative;
+    background: white;
+}
+
+.pdf-header-logo {
+    position: absolute;
+    top: 5px;
+    left: 10px;
+    width: 70px;
+    height: 70px;
+    object-fit: contain;
+    border-radius: 8px;
+    border: 2px solid #C9D9EE;
+    background: white;
+    padding: 2px;
+}
+
+.pdf-header h1 { font-family: 'Amiri', serif; font-size: 1.4rem; color: #1E5AA8; margin-bottom: 2px; font-weight: 700; }
+.pdf-header p  { margin: 2px 0; line-height: 1.3; color: #1F3652; font-size: 0.85rem; }
+.pdf-header p strong { color: #1E5AA8; font-weight: 700; }
+
+.pdf-table { width: 100%; border-collapse: collapse; margin-top: 2px; font-family: 'Cairo', sans-serif; }
+.pdf-table th { background: white; color: #1E5AA8; padding: 4px 5px; font-size: 0.8rem; font-weight: 700; text-align: center; border: 1px solid black; line-height: 1.3; }
+.pdf-table td { padding: 5px 6px; text-align: right; border: 1px solid black; font-size: 0.75rem; vertical-align: top; line-height: 1.7; }
+.pdf-table tr:nth-child(even) { background: #FAFAF8; }
+.pdf-day-header { background: white !important; color: #1E5AA8; font-weight: 700; text-align: center !important; font-size: 0.85rem !important; border: 1px solid black !important; }
+.pdf-big-review-cell { direction: rtl; unicode-bidi: isolate; text-align: right !important; padding-right: 4px !important; font-family: 'Amiri', serif; font-size: 0.82rem !important; line-height: 1.45 !important; }
+.pdf-main-text-cell { direction: rtl; unicode-bidi: isolate; text-align: right !important; padding-right: 4px !important; font-family: 'Amiri', serif; font-size: 0.82rem !important; line-height: 1.45 !important; }
+.pdf-main-text-line { display: block; width: 100%; margin: 0; padding: 1px 0; }
+.pdf-big-review-line { display: block; width: 100%; margin: 0; padding: 1px 0; }
+.pdf-big-review-line + .pdf-big-review-line { border-top: 1px dotted #D7D7D7; margin-top: 2px; padding-top: 3px; }
+.pdf-cell-placeholder { color: #7A7A7A; font-family: 'Cairo', sans-serif; font-weight: 600; }
+.pdf-cell-note { color: #8A8A8A; font-family: 'Cairo', sans-serif; font-weight: 600; }
+
+@media print {
+    #pdfContainer { display: block !important; visibility: visible !important; }
+    .pdf-page { display: block !important; }
+}
+</style>
+
+{# ─── Plan card ─── #}
+<div class="plan-card">
+    <div class="plan-card-header">
+        <img src="{% static 'images/logo.jpg' %}" alt="الشعار" class="plan-card-logo">
+        <div class="plan-card-header-text">
+            <h2>خطة طالب واحد</h2>
+            <p>يمكنك تعديل نوع الحفظ والمراجعات ثم تصدير الخطة</p>
+        </div>
+    </div>
+
+    <div class="plan-card-body">
+
+        <div class="pg-form-group">
+            <label for="memAmountSelect">نوع الحفظ</label>
+            <select id="memAmountSelect"></select>
+        </div>
+
+        <div class="pg-form-group" id="memStartGroup">
+            <label for="memStartSelect">بداية الحفظ</label>
+            <select id="memStartSelect"></select>
+        </div>
+
+        <hr class="pg-divider">
+
+        <!-- <div class="pg-checkbox-row">
+            <label for="reviewOnlyCheck">مراجعة فقط؟</label>
+            <input type="checkbox" id="reviewOnlyCheck">
+        </div> -->
+
+        <div class="pg-form-group">
+            <label for="minorSurahSelect">سورة المراجعة الصغرى</label>
+            <select id="minorSurahSelect"></select>
+        </div>
+
+        <div class="pg-form-group">
+            <label for="minorAyahSelect">آية بداية المراجعة الصغرى</label>
+            <select id="minorAyahSelect"></select>
+        </div>
+
+        <div class="pg-form-group">
+            <label for="minorPagesInput">عدد صفحات المراجعة الصغرى اليومية</label>
+            <input type="number" id="minorPagesInput" min="1" value="2">
+        </div>
+
+        <hr class="pg-divider">
+
+        <div class="pg-form-group">
+            <label for="bigSurahSelect">سورة بداية المراجعة الكبرى</label>
+            <select id="bigSurahSelect"></select>
+        </div>
+
+        <div class="pg-form-group">
+            <label for="bigPagesInput">عدد صفحات المراجعة الكبرى اليومية</label>
+            <input type="number" id="bigPagesInput" min="1" value="{{ preference.big_review_pages|default:5 }}">
+        </div>
+
+        <div class="plan-actions">
+            <button type="button" class="btn btn-pg-secondary" id="exportExcelBtn">
+                ⬇️ تصدير قوالب الحفظ (Excel)
+            </button>
+            <button type="button" class="btn btn-pg-primary" id="downloadPdfBtn">
+                📥 تحميل خطة الطالب PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="plan-back-row">
+    <a href="{% url 'teacher_students_data' %}" class="btn btn-outline-secondary btn-sm">
+        ← العودة إلى بيانات الطلاب
+    </a>
+</div>
+
+<div id="pdfContainer"></div>
+
+{# ─── Django-injected student data ─── #}
+<script>
+    var STUDENT_ID    = "{{ student.student_unique_id|escapejs }}";
+    var STUDENT_NAME  = "{{ student.full_name|escapejs }}";
+    var PREF_MEM_PLAN = "{{ preference.mem_plan|default:'1'|escapejs }}";
+    var PREF_BIG_PAGES = parseInt("{{ preference.big_review_pages|default:5 }}") || 5;
+    var LOGO_URL      = "{% static 'images/logo.jpg' %}";
+    var CAN_IMPORT    = {% if user|has_role:'manager' %}true{% else %}false{% endif %};
+</script>
+
+{# ─── External libs ─── #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="{% static 'planner/quran-data.js' %}"></script>
+<script src="{% static 'planner/app.js' %}"></script>
+
+{# ─── Native page controller ─── #}
+<script>
+(function () {
+    /* app.js exposes (in its IIFE-free script scope):
+       TEMPLATE_DEFINITIONS, memorizationData,
+       planValueToKey, populateSurahSelect, populateAyahSelect,
+       buildPlansHTMLFromRows, exportMemorizationBundle,
+       restoreMemorizationBundleFromServer                          */
+
+    var memAmountSel  = document.getElementById('memAmountSelect');
+    var memStartSel   = document.getElementById('memStartSelect');
+    var reviewCheck   = document.getElementById('reviewOnlyCheck');
+    var minorSurahSel = document.getElementById('minorSurahSelect');
+    var minorAyahSel  = document.getElementById('minorAyahSelect');
+    var minorPagesIn  = document.getElementById('minorPagesInput');
+    var bigSurahSel   = document.getElementById('bigSurahSelect');
+    var bigPagesIn    = document.getElementById('bigPagesInput');
+    var exportBtn     = document.getElementById('exportExcelBtn');
+    var pdfBtn        = document.getElementById('downloadPdfBtn');
+
+    function wireActionButtons() {
+        if (exportBtn && !exportBtn.dataset.bound) {
+            exportBtn.addEventListener('click', doExportExcel);
+            exportBtn.dataset.bound = '1';
+        }
+        if (pdfBtn && !pdfBtn.dataset.bound) {
+            pdfBtn.addEventListener('click', doDownloadPdf);
+            pdfBtn.dataset.bound = '1';
+        }
+    }
+
+    function populateMemAmountOptions() {
+        memAmountSel.innerHTML = '';
+        TEMPLATE_DEFINITIONS.forEach(function(t) {
+            var opt = document.createElement('option');
+            opt.value = t.value;
+            opt.textContent = t.title.replace(/[^\u0600-\u06FFA-Za-z0-9\s.]+/g, '').trim() || t.title;
+            memAmountSel.appendChild(opt);
+        });
+        var none = document.createElement('option');
+        none.value = 'none';
+        none.textContent = 'مراجعة فقط';
+        memAmountSel.appendChild(none);
+        memAmountSel.value = PREF_MEM_PLAN || '1';
+    }
+
+    function populateMemStart(amount, keepValue) {
+        if (amount === 'none') {
+            memStartSel.innerHTML = '<option value="">لا يوجد حفظ</option>';
+            memStartSel.disabled = true;
+            memStartSel.style.opacity = '0.5';
+            return;
+        }
+        var planKey = planValueToKey(amount);
+        var data = (memorizationData[planKey] || {}).data || [];
+        var prev = keepValue ? memStartSel.value : null;
+        memStartSel.innerHTML = '';
+        data.forEach(function(entry, idx) {
+            var opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = entry;
+            memStartSel.appendChild(opt);
+        });
+        if (prev) memStartSel.value = prev;
+        else memStartSel.value = '0';
+        memStartSel.disabled = false;
+        memStartSel.style.opacity = '1';
+    }
+
+    function applyReviewMode(isReview) {
+        if (reviewCheck) {
+            reviewCheck.checked = isReview;
+        }
+        memStartSel.disabled = isReview;
+        memStartSel.style.opacity = isReview ? '0.5' : '1';
+        [minorSurahSel, minorAyahSel, minorPagesIn].forEach(function(el) {
+            el.disabled = !isReview;
+            el.style.opacity = isReview ? '1' : '0.45';
+        });
+        if (isReview) {
+            memAmountSel.value = 'none';
+            populateMemStart('none', false);
+        }
+    }
+
+    async function init() {
+        // Bind actions first so buttons stay functional even if init setup fails.
+        wireActionButtons();
+
+        try { await restoreMemorizationBundleFromServer(); } catch(e) {}
+
+        try {
+            populateMemAmountOptions();
+            populateSurahSelect(minorSurahSel, 78);
+            populateSurahSelect(bigSurahSel,   78);
+            populateAyahSelect(minorAyahSel, 78, 1);
+            bigPagesIn.value = PREF_BIG_PAGES;
+            populateMemStart(memAmountSel.value, false);
+            applyReviewMode(memAmountSel.value === 'none');
+        } catch (e) {
+            console.error('Initialization error in teacher_student_plan:', e);
+        }
+
+        if (memAmountSel) {
+            memAmountSel.addEventListener('change', function() {
+                populateMemStart(memAmountSel.value, true);
+                applyReviewMode(memAmountSel.value === 'none');
+            });
+        }
+
+        if (reviewCheck) {
+            reviewCheck.addEventListener('change', function() {
+                applyReviewMode(reviewCheck.checked);
+            });
+        }
+
+        if (minorSurahSel) {
+            minorSurahSel.addEventListener('change', function() {
+                populateAyahSelect(minorAyahSel, parseInt(minorSurahSel.value), 1);
+            });
+        }
+    }
+
+    /* Build a synthetic <tr> that buildPlansHTMLFromRows() can read */
+    function buildFakeRow() {
+        var tr = document.createElement('tr');
+        tr.dataset.studentId   = STUDENT_ID;
+        tr.dataset.studentName = STUDENT_NAME;
+
+        function td(cls, el) {
+            var cell = document.createElement('td');
+            if (cls) el.className = cls;
+            cell.appendChild(el);
+            return cell;
+        }
+
+        var maSel = document.createElement('select');
+        maSel.className = 'student-mem-amount';
+        TEMPLATE_DEFINITIONS.forEach(function(t) {
+            var o = document.createElement('option');
+            o.value = t.value; o.textContent = t.title;
+            maSel.appendChild(o);
+        });
+        var none2 = document.createElement('option');
+        none2.value = 'none'; none2.textContent = 'مراجعة فقط';
+        maSel.appendChild(none2);
+        maSel.value = memAmountSel.value;
+
+        var msSel = document.createElement('select');
+        msSel.className = 'student-mem-start';
+        Array.from(memStartSel.options).forEach(function(o) {
+            var c = document.createElement('option');
+            c.value = o.value; c.textContent = o.textContent;
+            msSel.appendChild(c);
+        });
+        msSel.value = memStartSel.value;
+
+        var rvCk = document.createElement('input');
+        rvCk.type = 'checkbox'; rvCk.className = 'student-review-only';
+        rvCk.checked = reviewCheck ? reviewCheck.checked : (memAmountSel.value === 'none');
+
+        var miSur = document.createElement('select');
+        miSur.className = 'student-minor-surah';
+        populateSurahSelect(miSur, parseInt(minorSurahSel.value));
+        miSur.value = minorSurahSel.value;
+
+        var miAyh = document.createElement('select');
+        miAyh.className = 'student-minor-ayah';
+        populateAyahSelect(miAyh, parseInt(minorSurahSel.value), parseInt(minorAyahSel.value));
+        miAyh.value = minorAyahSel.value;
+
+        var miPg = document.createElement('input');
+        miPg.type = 'number'; miPg.className = 'student-minor-pages';
+        miPg.value = minorPagesIn.value;
+
+        var bgSur = document.createElement('select');
+        bgSur.className = 'student-rev-surah';
+        populateSurahSelect(bgSur, parseInt(bigSurahSel.value));
+        bgSur.value = bigSurahSel.value;
+
+        var bgPg = document.createElement('input');
+        bgPg.type = 'number'; bgPg.className = 'student-rev-pages';
+        bgPg.value = bigPagesIn.value;
+
+        tr.appendChild(td(null, maSel));
+        tr.appendChild(td(null, msSel));
+        tr.appendChild(td(null, rvCk));
+        tr.appendChild(td(null, miSur));
+        tr.appendChild(td(null, miAyh));
+        tr.appendChild(td(null, miPg));
+        tr.appendChild(td(null, bgSur));
+        tr.appendChild(td(null, bgPg));
+        return tr;
+    }
+
+    async function doDownloadPdf() {
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = '⏳ جاري إنشاء PDF...';
+
+        try {
+            var fakeRow = buildFakeRow();
+            var html    = buildPlansHTMLFromRows([fakeRow]);
+            if (!html) { alert('تعذر بناء الخطة. تحقق من البيانات.'); return; }
+
+            var cont = document.getElementById('pdfContainer');
+            cont.innerHTML    = html;
+            cont.style.display    = 'block';
+            cont.style.visibility = 'visible';
+            cont.style.position   = 'absolute';
+            cont.style.left       = '-9999px';
+            cont.style.top        = '0';
+
+            await new Promise(function(r){ setTimeout(r, 250); });
+
+            var jsPDF2 = window.jspdf.jsPDF;
+            var pdf    = new jsPDF2('p', 'mm', 'a4');
+            var page   = cont.querySelector('.pdf-page');
+
+            if (page) {
+                page.style.display    = 'block';
+                page.style.visibility = 'visible';
+                var dpr   = window.devicePixelRatio || 1;
+                var scale = Math.max(4 / dpr, 3);
+
+                var canvas = await html2canvas(page, {
+                    scale: scale,
+                    allowTaint: true,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff',
+                    width:  page.scrollWidth,
+                    height: page.scrollHeight,
+                });
+
+                var imgData = canvas.toDataURL('image/png');
+                var margin  = 5;
+                var imgW    = 210 - margin * 2;
+                var imgH    = (canvas.height * imgW) / canvas.width;
+                var maxH    = 297 - margin * 2;
+
+                if (imgH > maxH) {
+                    var sh = maxH;
+                    var sw = (canvas.width * sh) / canvas.height;
+                    pdf.addImage(imgData, 'PNG', (210 - sw) / 2, margin, sw, sh);
+                } else {
+                    pdf.addImage(imgData, 'PNG', margin, margin, imgW, imgH);
+                }
+            }
+
+            cont.innerHTML        = '';
+            cont.style.display    = 'none';
+            cont.style.visibility = 'hidden';
+            cont.style.position   = '';
+            cont.style.left       = '';
+
+            var safeName = STUDENT_NAME.replace(/[^\w\u0600-\u06FF]/g, '_');
+            var d  = new Date();
+            var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+            pdf.save('خطة_قرآنية_' + safeName + '_' + ds + '.pdf');
+            alert('✅ تم إنشاء ملف PDF بنجاح!');
+
+        } catch (err) {
+            console.error(err);
+            alert('حدث خطأ أثناء إنشاء PDF:\n' + err.message);
+        } finally {
+            pdfBtn.disabled    = false;
+            pdfBtn.textContent = '📥 تحميل خطة الطالب PDF';
+        }
+    }
+
+    function doExportExcel() {
+        if (!window.XLSX) { alert('مكتبة Excel لم تُحمَّل بعد، حاول مرة أخرى.'); return; }
+        try { exportMemorizationBundle(); }
+        catch(e) { alert('تعذر التصدير: ' + e.message); }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>
+{% endblock %}

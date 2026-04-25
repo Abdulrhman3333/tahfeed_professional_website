@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">الإحصائيات الشاملة</h1>
+        <p class="page-hero-subtitle">تاريخ اليوم: {{ today }}</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+    
+    <!-- الإحصائيات العامة -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">إجمالي الطلاب</h5>
+                    <h2 class="card-text">{{ total_students }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">الطلاب المختبرين</h5>
+                    <h2 class="card-text">{{ total_tested }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">الغياب اليومي</h5>
+                    <h2 class="card-text">{{ total_absent_today }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">غياب المعلمين اليوم</h5>
+                    <h2 class="card-text">{{ total_teacher_absent_today }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- إحصائيات المراحل -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">إحصائيات المراحل الدراسية</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>المرحلة</th>
+                            <th>إجمالي الطلاب</th>
+                            <th>المختبرين</th>
+                            <th>الغياب اليومي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stage in stage_stats %}
+                        <tr>
+                            <td><strong>{{ stage.stage }}</strong></td>
+                            <td><span class="badge bg-primary">{{ stage.total_students }}</span></td>
+                            <td><span class="badge bg-success">{{ stage.tested }}</span></td>
+                            <td><span class="badge bg-warning text-dark">{{ stage.absent_today }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center">لا توجد بيانات للمراحل</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- إحصائيات المعلمين -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">إحصائيات المعلمين</h5>
+        </div>
+        <div class="card-body">
+            {% for teacher in teacher_stats %}
+            <div class="accordion mb-3" id="teacherAccordion_{{ teacher.teacher|slugify }}">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#teacher_{{ teacher.teacher|slugify }}">
+                            <strong>{{ teacher.teacher }}</strong>
+                            <span class="badge bg-primary ms-2">طلاب: {{ teacher.total_students }}</span>
+                            <span class="badge bg-success ms-2">مختبرين: {{ teacher.tested }}</span>
+                            <span class="badge bg-warning text-dark ms-2">غياب الطلاب: {{ teacher.absent_today }}</span>
+                            <span class="badge bg-danger ms-2">غياب المعلم: {{ teacher.teacher_self_absent_today }}</span>
+                        </button>
+                    </h2>
+                    <div id="teacher_{{ teacher.teacher|slugify }}" class="accordion-collapse collapse" data-bs-parent="#teacherAccordion_{{ teacher.teacher|slugify }}">
+                        <div class="accordion-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>المرحلة</th>
+                                            <th>الطلاب</th>
+                                            <th>المختبرين</th>
+                                            <th>الغياب اليومي</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for stage in teacher.stage_stats %}
+                                        <tr>
+                                            <td>{{ stage.stage }}</td>
+                                            <td><span class="badge bg-info">{{ stage.total_students }}</span></td>
+                                            <td><span class="badge bg-success">{{ stage.tested }}</span></td>
+                                            <td><span class="badge bg-warning text-dark">{{ stage.absent_today }}</span></td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted">لا يوجد طلاب</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="alert alert-info">لا يوجد معلمين بعد</div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .card {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .accordion-button:not(.collapsed) {
+        background-color: #f8f9fa;
+        color: #000;
+    }
+    
+    .badge {
+        padding: 0.5em 0.7em;
+        font-size: 0.9em;
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

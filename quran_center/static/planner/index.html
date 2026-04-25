@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مخطط تحفيظ القرآن الكريم - 24 يوم</title>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+        <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p style="text-align: center; font-weight: 600;">جاري إنشاء الخطة...</p>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <img src="../images/logo.jpg" alt="الشعار" class="logo">
+            <div class="header-content">
+                <h1>📖 مخطط تحفيظ القرآن الكريم - 24 يوم</h1>
+                <p>نظام متكامل لخطط الحفظ والمراجعة المخصصة</p>
+            </div>
+        </div>
+
+        <div class="form-container">
+            <div class="form-group" style="margin-bottom: 2rem;">
+                <label>بيانات الطلاب (حتى 30 طالباً)</label>
+                <textarea id="studentNames" rows="4" placeholder="اكتب لكل طالب: رقم-الاسم في سطر منفصل (مثال: 1-أحمد)"></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 2rem;">
+                <div class="table-toolbar global-settings" style="margin-top: 1rem;">
+                    <label for="globalMinorReviewSurah">الاختيار الافتراضي للمراجعة الصغرى</label>
+                    <select id="globalMinorReviewSurah" onchange="updateGlobalMinorAyah()" style="width: 150px;">
+                        <!-- Will be populated by JS -->
+                    </select>
+                    <select id="globalMinorReviewAyah" style="width: 80px;">
+                        <!-- Will be populated by JS -->
+                    </select>
+                    <input type="number" id="globalMinorReviewPages" value="2" min="1" style="width: 80px;">
+                    <span class="compact-note">يُطبَّق فوراً على كل الطلاب ويمكن تعديله لكل طالب.</span>
+                </div>
+                <div class="table-toolbar global-settings" style="margin-top: 1rem;">
+                    <label for="globalBigReviewSurah">الاختيار الافتراضي للمراجعة الكبرى</label>
+                    <select id="globalBigReviewSurah" onchange="updateGlobalBigAyah()" style="width: 150px;">
+                        <!-- Will be populated by JS -->
+                    </select>
+                    <select id="globalBigReviewAyah" style="width: 80px;">
+                        <!-- Will be populated by JS -->
+                    </select>
+                    <input type="number" id="globalBigReviewPages" value="5" min="1" style="width: 80px;">
+                    <span class="compact-note">يُطبَّق فوراً على كل الطلاب ويمكن تعديله لكل طالب.</span>
+                </div>
+                <div class="students-table-wrap" style="overflow-x: auto;">
+                    <table id="studentsTable" class="pdf-table" style="width:100%; font-size:0.9rem;">
+                        <thead>
+                            <tr>
+                                <th style="width:130px;">نوع الحفظ</th>
+                                <th>بداية الحفظ</th>
+                                <th style="width:110px;">مراجعة فقط؟</th>
+                                <th style="width:150px;">سورة المراجعة الصغرى</th>
+                                <th style="width:90px;">آية البداية</th>
+                                <th style="width:90px;">صفحات المراجعة الصغرى</th>
+                                <th>سورة بداية المراجعة الكبرى</th>
+                                <th style="width:80px;">صفحات المراجعة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- سيتم تعبئته تلقائياً -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="hidden-block" id="memorizationWrapper">
+                <!-- Memorization Section -->
+                <div class="section-header">📖 إعدادات الحفظ</div>
+                <div class="form-grid">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label>نوع خطة الحفظ</label>
+                        <div class="plan-selector" id="templateOptions"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>بداية الحفظ</label>
+                        <select id="memStartSurah">
+                            <option value="">اختر بداية الحفظ...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Big Review Section -->
+                <div class="section-header">📚 إعدادات المراجعة الكبرى</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>بداية المراجعة - السورة</label>
+                        <select id="bigReviewSurah" onchange="updateBigReviewAyahOptions()">
+                            <!-- Will be populated by JS -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>بداية المراجعة - الآية</label>
+                        <select id="bigReviewAyah">
+                            <!-- Will be populated by JS -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>عدد الصفحات يومياً</label>
+                        <input type="number" id="bigReviewPages" value="5" min="1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-container">
+                <button type="button" class="btn btn-secondary" id="importPlansBtn">⬆️ استيراد قوالب الحفظ (Excel)</button>
+                <button type="button" class="btn btn-secondary" id="exportPlansBtn">⬇️ تصدير قوالب الحفظ (Excel)</button>
+                <button class="btn btn-primary" onclick="downloadSelectedAsPDF(this)">📥 تحميل خطة الطالب PDF</button>
+            </div>
+            <input type="file" id="importPlansInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none;">
+        </div>
+    </div>
+
+    <div id="pdfContainer"></div>
+
+    <script src="quran-data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+

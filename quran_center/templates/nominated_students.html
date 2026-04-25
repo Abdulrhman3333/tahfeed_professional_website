@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}المرشحون للاختبار{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">المرشحون للاختبار</h1>
+        <p class="page-hero-subtitle">إدخال درجات الاختبار الداخلي للطلاب المرشحين</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+    
+    {% if nominations %}
+    <form method="post">
+        {% csrf_token %}
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>اسم الطالب</th>
+                        <th>الجزء المراد اختباره</th>
+                        <th>درجة المعلم</th>
+                        <th>درجة الاختبار الداخلي</th>
+                        <th>حذف</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in nominations %}
+                    <tr>
+                        <td>{{ item.nomination.student.full_name }}</td>
+                        <td><span class="badge bg-success">{{ item.next_part }}</span></td>
+                        <td><span class="badge bg-info">{{ item.nomination.teacher_grade|floatformat:2 }}</span></td>
+                        <td>
+                            <input type="number" 
+                                   name="internal_grade_{{ item.nomination.id }}" 
+                                   class="form-control" 
+                                placeholder="درجة الاختبار الداخلي"
+                                   min="0" 
+                                   max="100" 
+                                   step="0.5">
+                        </td>
+                        <td>
+                            <button type="submit"
+                                    class="btn btn-outline-danger btn-sm"
+                                    formaction="{% url 'delete_nomination' item.nomination.id %}"
+                                    formmethod="post"
+                                    formnovalidate
+                                    name="next"
+                                    value="{% url 'nominated_students' %}"
+                                    onclick="return confirm('هل تريد حذف هذا الترشيح؟');">
+                                حذف
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <button type="submit" class="btn btn-success btn-lg w-100 mt-3">
+            حفظ النتائج
+        </button>
+    </form>
+    {% else %}
+    <div class="alert alert-info">
+        لا يوجد مرشحون للاختبار حالياً.
+    </div>
+    {% endif %}
+    
+    <div class="mt-3">
+        <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary">العودة للوحة التحكم</a>
+    </div>
+</div>
+{% endblock %}

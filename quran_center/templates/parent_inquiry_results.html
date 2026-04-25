@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}حلقات جامع الحمودي - حالة الأبناء{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">تقرير حالة الأبناء</h1>
+        <p class="page-hero-subtitle">رقم الجوال: {{ parent_phone }}</p>
+    </div>
+</div>
+
+{% if students %}
+    <div class="row">
+        {% for student in students %}
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-lg" style="border-top: 4px solid #0ea5e9;">
+                <div class="card-header" style="background: linear-gradient(90deg, #0ea5e9 0%, #0284c7 100%); color: white;">
+                    <h5 style="margin: 0; font-family: 'El Messiri', serif; font-size: 1.3rem;">{{ student.full_name }}</h5>
+                    <small style="opacity: 0.9;">المرحلة: <strong>{{ student.educational_stage }}</strong></small>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <p style="margin: 0.3rem 0;"><strong>اسم المعلم:</strong> {{ student.teacher.username }}</p>
+                        {% if student.teacher_phone %}
+                        <p style="margin: 0.3rem 0;"><strong>رقم المعلم:</strong> {{ student.teacher_phone }}</p>
+                        <a href="https://wa.me/966{{ student.teacher_phone|slice:'1:' }}?text=السلام عليكم ورحمة الله وبركاته، أود التواصل بخصوص الطالب {{ student.full_name }}" target="_blank" class="btn btn-sm btn-success" style="margin-top: 0.5rem; display: inline-block;">
+                            💬 التواصل مع المعلم عبر واتساب
+                        </a>
+                        {% endif %}                        
+                        <p style="margin: 0.3rem 0;"><strong>الحالة:</strong> <span class="badge bg-success">{{ student.status }}</span></p>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <h6 style="font-family: 'El Messiri', serif; margin-bottom: 1rem; color: #5B8FBE;">📊 إحصائيات الحضور</h6>
+                        <div class="row text-center">
+                            <div class="col-6 col-md-3">
+                                <small class="text-muted">حاضر</small>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">{{ student.present_count }}</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <small class="text-muted">غائب</small>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">{{ student.absent_count }}</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <small class="text-muted">غياب بعذر</small>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #111827;">{{ student.absent_excused_count }}</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <small class="text-muted">منصرف</small>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">{{ student.excused_count }}</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <small class="text-muted">متأخر</small>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #8b5cf6;">{{ student.late_count }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div>
+                        <h6 style="font-family: 'El Messiri', serif; margin-bottom: 1rem; color: #5B8FBE;">📅 آخر الحضور والغياب</h6>
+                        {% if student.recent_attendance %}
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped" style="font-size: 0.9rem;">
+                                    <thead style="background-color: #f3f4f6;">
+                                        <tr>
+                                            <th>التاريخ</th>
+                                            <th>الحالة</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for attendance in student.recent_attendance %}
+                                        <tr>
+                                            <td>{{ attendance.date|date:"Y-m-d" }}</td>
+                                            <td>
+                                                {% if attendance.status == "حاضر" %}
+                                                    <span class="badge bg-success">{{ attendance.status }}</span>
+                                                {% elif attendance.status == "غائب" %}
+                                                    <span class="badge bg-danger">{{ attendance.status }}</span>
+                                                {% elif attendance.status == "غياب بعذر" %}
+                                                    <span class="badge bg-dark">{{ attendance.status }}</span>
+                                                {% elif attendance.status == "مستأذن" %}
+                                                    <span class="badge bg-warning text-dark">منصرف</span>
+                                                {% elif attendance.status == "متأخر" %}
+                                                    <span class="badge bg-purple" style="background-color: #8b5cf6;">{{ attendance.status }}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted" style="text-align: center; margin: 0;">لا توجد سجلات حضور حتى الآن</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <h4 class="alert-heading">لم يتم العثور على أبناء</h4>
+        <p>لم نجد أي أبناء مسجلين برقم الجوال الذي أدخلته.</p>
+        <hr>
+        <p class="mb-0">يرجى التأكد من رقم الجوال والمحاولة مرة أخرى.</p>
+    </div>
+{% endif %}
+
+<div class="text-center mt-4">
+    <a href="{% url 'parent_inquiry' %}" class="btn btn-primary">بحث جديد</a>
+    <a href="{% url 'welcome' %}" class="btn btn-outline-secondary">العودة للصفحة الرئيسية</a>
+</div>
+{% endblock %}

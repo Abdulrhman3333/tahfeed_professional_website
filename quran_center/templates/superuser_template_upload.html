@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}رفع قوالب الحفظ Excel{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">رفع قوالب الحفظ (Superuser)</h1>
+        <p class="page-hero-subtitle">رفع ملف Excel جديد لتحديث قوالب الحفظ لجميع المستخدمين</p>
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">الحزمة النشطة حالياً</h5>
+    </div>
+    <div class="card-body">
+        {% if active_bundle %}
+            <div class="mb-2"><strong>اسم الملف:</strong> {{ active_bundle.source_filename|default:"-" }}</div>
+            <div class="mb-2"><strong>عدد القوالب:</strong> {{ active_bundle.template_definitions|length }}</div>
+            <div class="mb-0"><strong>آخر تحديث:</strong> {{ active_bundle.created_at }}</div>
+        {% else %}
+            <div class="alert alert-warning mb-0">لا توجد حزمة مفعلة بعد. سيتم استخدام القوالب الافتراضية داخل المولد حتى يتم الرفع.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card shadow mb-4">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0">تعليمات الملف</h5>
+    </div>
+    <div class="card-body">
+        <p class="mb-2">الملف يجب أن يكون بصيغة <strong>.xlsx</strong>.</p>
+        <p class="mb-2">أفضل صيغة مدعومة: ملف تم تصديره من منشئ الخطط (زر تصدير القوالب).</p>
+        <p class="mb-0 text-muted">بعد الرفع الناجح سيتم تفعيل الحزمة الجديدة مباشرة لجميع صفحات منشئ الخطط.</p>
+    </div>
+</div>
+
+<div class="card shadow">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0">رفع ملف القوالب</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label">{{ form.excel_file.label }}</label>
+                {{ form.excel_file }}
+                {% if form.excel_file.errors %}
+                    <div class="text-danger small mt-2">{{ form.excel_file.errors }}</div>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-success">رفع وتفعيل القوالب</button>
+        </form>
+    </div>
+</div>
+
+{% if result and result.saved %}
+<div class="alert alert-success mt-4">
+    <strong>تم الحفظ بنجاح.</strong>
+    تم تفعيل الحزمة الجديدة (ID: {{ result.bundle_id }}) وعدد القوالب {{ result.template_count }}.
+</div>
+{% endif %}
+{% endblock %}

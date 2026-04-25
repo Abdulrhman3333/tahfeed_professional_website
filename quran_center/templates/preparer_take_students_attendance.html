@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}تحضير جميع الطلاب{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">تحضير جميع الطلاب</h1>
+        <p class="page-hero-subtitle">اختر المعلم ثم حضّر طلابه لليوم المحدد</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+    {% if success %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>نجح!</strong> تم حفظ تحضير الطلاب بنجاح للتاريخ {{ selected_date|date:"Y/m/d" }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    {% if error_message %}
+    <div class="alert alert-danger" role="alert">
+        {{ error_message }}
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5>بيانات التحضير</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">التاريخ:</label>
+                        <input type="date" id="attendance_date_input" name="attendance_date" class="form-control" value="{{ selected_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">المعلم:</label>
+                        <select name="teacher_id" id="teacher_id" class="form-select" required>
+                            <option value="">-- اختر المعلم --</option>
+                            {% for item in teachers %}
+                            <option value="{{ item.teacher.id }}" {% if selected_teacher and selected_teacher.id == item.teacher.id %}selected{% endif %}>
+                                {{ item.display_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="alert alert-secondary w-100 mb-0">
+                            اليوم: <strong id="display_weekday">{{ current_weekday }}</strong> | الأسبوع: <strong id="display_week">{{ current_week }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if selected_teacher %}
+            <div class="alert alert-info">
+                المعلم المختار: <strong>{{ selected_teacher.get_full_name|default:selected_teacher.username }}</strong>
+            </div>
+
+            {% if students_with_status %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>اسم الطالب</th>
+                            <th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in students_with_status %}
+                        <tr>
+                            <td>{{ item.student.full_name }}</td>
+                            <td>
+                                <input type="hidden" name="status_{{ item.student.id }}" id="input_{{ item.student.id }}" value="{{ item.status }}">
+                                <button type="button"
+                                    class="btn {% if item.status == 'غائب' %}btn-danger{% elif item.status == 'غياب بعذر' %}btn-dark{% elif item.status == 'مستأذن' %}btn-warning{% elif item.status == 'متأخر' %}btn-secondary{% else %}btn-primary{% endif %}"
+                                    onclick="toggleStatus('{{ item.student.id }}')"
+                                    id="btn_{{ item.student.id }}">{% if item.status == 'مستأذن' %}منصرف{% else %}{{ item.status }}{% endif %}</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <button type="submit" class="btn btn-dark w-100">إتمام التحضير وحفظ النتائج</button>
+            {% else %}
+            <div class="alert alert-warning">لا يوجد طلاب منتظمون لهذا المعلم.</div>
+            {% endif %}
+        {% else %}
+        <div class="alert alert-secondary">اختر اسم المعلم ليتم عرض الطلاب.</div>
+        {% endif %}
+    </form>
+</div>
+
+<script>
+const weekdayMap = {
+    0: 'الأحد',
+    1: 'الاثنين',
+    2: 'الثلاثاء',
+    3: 'الأربعاء',
+    4: 'الخميس',
+    5: 'الجمعة',
+    6: 'السبت'
+};
+
+function getWeekNumber(date) {
+    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+    const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+}
+
+function updateDayAndWeek() {
+    const dateInput = document.getElementById('attendance_date_input');
+    const dateStr = dateInput.value;
+    if (!dateStr) return;
+
+    const date = new Date(dateStr + 'T00:00:00');
+    const weekday = weekdayMap[date.getDay()];
+    const week = getWeekNumber(date);
+
+    document.getElementById('display_weekday').textContent = weekday;
+    document.getElementById('display_week').textContent = week;
+}
+
+const teacherSelect = document.getElementById('teacher_id');
+const dateInput = document.getElementById('attendance_date_input');
+
+function reloadWithFilters() {
+    const teacherId = teacherSelect.value;
+    const selectedDate = dateInput.value;
+    const params = new URLSearchParams();
+
+    if (teacherId) {
+        params.append('teacher_id', teacherId);
+    }
+    if (selectedDate) {
+        params.append('date', selectedDate);
+    }
+
+    const query = params.toString();
+    window.location.href = query ? `?${query}` : window.location.pathname;
+}
+
+if (teacherSelect) {
+    teacherSelect.addEventListener('change', reloadWithFilters);
+}
+if (dateInput) {
+    dateInput.addEventListener('change', function() {
+        updateDayAndWeek();
+        reloadWithFilters();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', updateDayAndWeek);
+
+function toggleStatus(id) {
+    const btn = document.getElementById('btn_' + id);
+    const input = document.getElementById('input_' + id);
+
+    if (input.value === 'حاضر') {
+        input.value = 'غائب';
+        btn.innerText = 'غائب';
+        btn.className = 'btn btn-danger';
+    } else if (input.value === 'غائب') {
+        input.value = 'غياب بعذر';
+        btn.innerText = 'غياب بعذر';
+        btn.className = 'btn btn-dark';
+    } else if (input.value === 'غياب بعذر') {
+        input.value = 'مستأذن';
+        btn.innerText = 'منصرف';
+        btn.className = 'btn btn-warning';
+    } else if (input.value === 'مستأذن') {
+        input.value = 'متأخر';
+        btn.innerText = 'متأخر';
+        btn.className = 'btn btn-secondary';
+    } else {
+        input.value = 'حاضر';
+        btn.innerText = 'حاضر';
+        btn.className = 'btn btn-primary';
+    }
+}
+</script>
+{% endblock %}

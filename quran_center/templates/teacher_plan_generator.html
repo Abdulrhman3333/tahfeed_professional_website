@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load static role_tags %}
+{% block title %}منشئ خطط الطلاب{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">منشئ خطط الطلاب</h1>
+        <p class="page-hero-subtitle">تم تعبئة الطلاب تلقائياً حسب معلمهم الحالي</p>
+    </div>
+</div>
+
+<div class="planner-shell">
+    <iframe
+        id="plannerFrame"
+        src="{% static 'planner/index.html' %}?v=20260424&can_import={% if user|has_role:'manager' %}1{% else %}0{% endif %}"
+        title="Plan Generator"
+        loading="lazy"
+        referrerpolicy="same-origin"
+    ></iframe>
+</div>
+
+<style>
+.planner-shell {
+    width: 100%;
+    min-height: 78vh;
+    border: 1px solid #d0dcff;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #f3f7ff;
+}
+
+#plannerFrame {
+    width: 100%;
+    min-height: 78vh;
+    border: 0;
+    display: block;
+}
+</style>
+
+{{ students_payload|json_script:"teacher-students-data" }}
+
+<script>
+(function () {
+    const students = JSON.parse(document.getElementById('teacher-students-data').textContent);
+    const frame = document.getElementById('plannerFrame');
+
+    function buildStudentLines(data) {
+        return data.map(function (item) {
+            return (item.name || '').trim() + '-' + (item.id || '').trim();
+        }).join('\n');
+    }
+
+    function applyTeacherPreset(doc) {
+        const root = doc.documentElement;
+        root.style.setProperty('--primary', '#0b5ed7');
+        root.style.setProperty('--primary-light', '#4f8ef7');
+        root.style.setProperty('--accent', '#1b4ea3');
+        root.style.setProperty('--bg', '#f4f8ff');
+        root.style.setProperty('--surface', '#ffffff');
+        root.style.setProperty('--text', '#0f2d63');
+        root.style.setProperty('--border', '#cfe0ff');
+        root.style.setProperty('--shadow', 'rgba(11, 94, 215, 0.12)');
+
+        const title = doc.querySelector('.header h1');
+        if (title) {
+            title.textContent = 'مخطط تحفيظ القرآن الكريم - منصة المعلم';
+        }
+
+        const subtitle = doc.querySelector('.header p');
+        if (subtitle) {
+            subtitle.textContent = 'الطلاب محملون تلقائياً حسب التعيين داخل المنصة';
+        }
+
+        const names = doc.getElementById('studentNames');
+        if (names) {
+            names.value = buildStudentLines(students);
+            names.setAttribute('readonly', 'readonly');
+            names.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        const allFormGroups = doc.querySelectorAll('.form-group');
+        if (allFormGroups.length > 0) {
+            // Hide manual input groups while keeping students table and controls visible.
+            allFormGroups.forEach(function (group, idx) {
+                if (idx === 0) {
+                    group.style.display = 'none';
+                }
+            });
+        }
+
+        const infoBar = doc.createElement('div');
+        infoBar.style.cssText = 'margin: 0 1rem 1rem; padding: .75rem 1rem; border-radius: 10px; background: #e9f1ff; border: 1px solid #cfe0ff; color: #0f2d63; font-weight: 600;';
+        infoBar.textContent = 'تم تعبئة بيانات الطلاب تلقائياً. في حال تغير قائمة الطلاب، حدّث الصفحة.';
+
+        const formContainer = doc.querySelector('.form-container');
+        if (formContainer && formContainer.firstChild) {
+            formContainer.insertBefore(infoBar, formContainer.firstChild);
+        }
+    }
+
+    frame.addEventListener('load', function () {
+        try {
+            const doc = frame.contentDocument || frame.contentWindow.document;
+            applyTeacherPreset(doc);
+        } catch (err) {
+            console.error('Unable to initialize planner frame:', err);
+        }
+    });
+})();
+</script>
+{% endblock %}

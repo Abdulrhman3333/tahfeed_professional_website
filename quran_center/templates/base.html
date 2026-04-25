@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% load static %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&family=El+Messiri:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" id="bootstrapCdnPrimary">
+    <script>
+        (function () {
+            // Some mobile networks block specific CDNs; load a fallback only if primary fails.
+            var primary = document.getElementById('bootstrapCdnPrimary');
+            if (!primary) return;
+
+            primary.onerror = function () {
+                var fallback = document.createElement('link');
+                fallback.rel = 'stylesheet';
+                fallback.href = 'https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.rtl.min.css';
+                fallback.id = 'bootstrapCdnFallback';
+                document.head.appendChild(fallback);
+            };
+        })();
+    </script>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <title>{% block title %}حلقات جامع الحمودي{% endblock %}</title>
+</head>
+<body class="bg-light">
+
+{% load role_tags %}
+
+<div class="mobile-topbar">
+    <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-controls="mobileSidebar" aria-expanded="false">
+        ☰
+    </button>
+    <span class="mobile-brand">حلقات جامع الحمودي</span>
+</div>
+
+<aside class="mobile-sidebar" id="mobileSidebar" aria-hidden="true">
+    <div class="mobile-sidebar-header">
+        <span class="mobile-sidebar-title">حلقات جامع الحمودي</span>
+        <button type="button" class="mobile-close-btn" id="mobileCloseBtn" aria-label="إغلاق القائمة">
+            ×
+        </button>
+    </div>
+    <div class="mobile-sidebar-body">
+        {% if user.is_authenticated %}
+            <div class="mobile-user">مرحباً، {{ user.username }}</div>
+
+            {% if user.stage_supervisor or user.is_superuser or user|has_role:"supervisor" %}
+            <!-- <a href="{% url 'home' %}" class="mobile-nav-link">تسجيل طالب</a> -->
+            <a href="{% url 'pending_students' %}" class="mobile-nav-link">الطلاب المنتظرين</a>
+            <a href="{% url 'stage_students_data' %}" class="mobile-nav-link">بيانات طلاب المرحلة</a>
+            {% endif %}
+
+            {% if not user.is_superuser and not user|has_role:"manager" %}
+            <a href="{% url 'teacher_dashboard' %}" class="mobile-nav-link">احصائية الغياب</a>
+            <a href="{% url 'teacher_students_data' %}" class="mobile-nav-link">بيانات الطلاب</a>
+            <a href="{% url 'take_attendance' %}" class="mobile-nav-link">التحضير</a>
+            <a href="{% url 'nominate_exam' %}" class="mobile-nav-link">ترشيح الاختبار</a>
+            {% endif %}
+
+            {% if user|has_role:"examiner" %}
+            <a href="{% url 'nominated_students' %}" class="mobile-nav-link">قائمة المرشحين</a>
+            <a href="{% url 'association_candidates' %}" class="mobile-nav-link">مرشحو الجمعية</a>
+            <a href="{% url 'association_results' %}" class="mobile-nav-link">نتائج الجمعية</a>
+            {% endif %}
+
+            {% if user|has_role:"manager" %}
+            <a href="{% url 'association_results' %}" class="mobile-nav-link">نتائج الجمعية</a>
+            {% endif %}
+
+            {% if user|has_role:"preparer" or user|has_role:"supervisor" or user.stage_supervisor or user.is_superuser %}
+            <a href="{% url 'preparer_take_attendance' %}" class="mobile-nav-link">تحضير المعلمين</a>
+            <a href="{% url 'preparer_take_students_attendance' %}" class="mobile-nav-link">تحضير جميع الطلاب</a>
+            <a href="{% url 'preparer_attendance_summary' %}" class="mobile-nav-link">متابعة التحضير</a>
+            {% if user|has_role:"preparer" %}
+            <a href="{% url 'preparer_absent_contacts' %}" class="mobile-nav-link">أرقام الغياب</a>
+            {% endif %}
+            {% endif %}
+
+            {% if user.is_superuser or user|has_role:"manager" %}
+            <a href="{% url 'bulk_students_upload' %}" class="mobile-nav-link">رفع طلاب Excel</a>
+            {% if user.is_superuser %}
+            <a href="{% url 'superuser_template_upload' %}" class="mobile-nav-link">رفع قوالب الحفظ Excel</a>
+            {% endif %}
+            <a href="{% url 'admin:index' %}" class="mobile-nav-link">لوحة الإدارة</a>
+            <a href="{% url 'admin_statistics' %}" class="mobile-nav-link">الإحصائيات</a>
+            {% endif %}
+
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="mobile-logout">تسجيل الخروج</button>
+            </form>
+        {% else %}
+            <a href="{% url 'welcome' %}" class="mobile-nav-link">الصفحة الرئيسية</a>
+            <a href="{% url 'login' %}" class="mobile-nav-link">دخول المعلمين</a>
+            <!-- <a href="{% url 'home' %}" class="mobile-nav-link">تسجيل طالب جديد</a> -->
+            <a href="{% url 'parent_inquiry' %}" class="mobile-nav-link">الاستعلام عن حالة الأبناء</a>
+        {% endif %}
+    </div>
+</aside>
+
+<div class="mobile-overlay" id="mobileOverlay" aria-hidden="true"></div>
+
+<nav class="navbar navbar-dark bg-dark mb-4">
+    <div class="container">
+        <span class="navbar-brand">حلقات جامع الحمودي</span>
+        <div>
+            {% if user.is_authenticated %}
+                <span class="text-white me-3">مرحباً، {{ user.username }}</span>
+                
+                <!-- روابط المشرف والمدير -->
+                {% if user.stage_supervisor or user.is_superuser or user|has_role:"supervisor" %}
+                <!-- <a href="{% url 'home' %}" class="btn btn-outline-success btn-sm me-2">تسجيل طالب</a> -->
+                <a href="{% url 'pending_students' %}" class="btn btn-outline-warning btn-sm me-2">الطلاب المنتظرين</a>
+                <a href="{% url 'stage_students_data' %}" class="btn btn-outline-warning btn-sm me-2">بيانات طلاب المرحلة</a>
+                {% endif %}
+                
+                <!-- روابط المعلم (مخفية للمديرين) -->
+                {% if not user.is_superuser and not user|has_role:"manager" %}
+                <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-info btn-sm me-2">احصائية الغياب</a>
+                <a href="{% url 'teacher_students_data' %}" class="btn btn-outline-info btn-sm me-2">بيانات الطلاب</a>
+                <a href="{% url 'take_attendance' %}" class="btn btn-outline-light btn-sm me-2">التحضير</a>
+                <a href="{% url 'nominate_exam' %}" class="btn btn-outline-primary btn-sm me-2">ترشيح الاختبار</a>
+                {% endif %}
+
+                <!-- روابط المختبر -->
+                {% if user|has_role:"examiner" %}
+                <a href="{% url 'nominated_students' %}" class="btn btn-outline-secondary btn-sm me-2">قائمة المرشحين</a>
+                <a href="{% url 'association_candidates' %}" class="btn btn-outline-secondary btn-sm me-2">مرشحو الجمعية</a>
+                <a href="{% url 'association_results' %}" class="btn btn-outline-secondary btn-sm me-2">نتائج الجمعية</a>
+                {% endif %}
+
+                {% if user|has_role:"manager" %}
+                <a href="{% url 'association_results' %}" class="btn btn-outline-secondary btn-sm me-2">نتائج الجمعية</a>
+                {% endif %}
+
+                <!-- روابط المحضّر -->
+                {% if user|has_role:"preparer" or user|has_role:"supervisor" or user.stage_supervisor or user.is_superuser %}
+                <a href="{% url 'preparer_take_attendance' %}" class="btn btn-outline-success btn-sm me-2">تحضير المعلمين</a>
+                <a href="{% url 'preparer_take_students_attendance' %}" class="btn btn-outline-success btn-sm me-2">تحضير جميع الطلاب</a>
+                <a href="{% url 'preparer_attendance_summary' %}" class="btn btn-outline-success btn-sm me-2">متابعة التحضير</a>
+                {% if user|has_role:"preparer" %}
+                <a href="{% url 'preparer_absent_contacts' %}" class="btn btn-outline-success btn-sm me-2">أرقام الغياب</a>
+                {% endif %}
+                {% endif %}
+                
+                <!-- روابط المدير -->
+                {% if user.is_superuser or user|has_role:"manager" %}
+                <a href="{% url 'bulk_students_upload' %}" class="btn btn-outline-warning btn-sm me-2">رفع طلاب Excel</a>
+                {% if user.is_superuser %}
+                <a href="{% url 'superuser_template_upload' %}" class="btn btn-outline-warning btn-sm me-2">رفع قوالب الحفظ Excel</a>
+                {% endif %}
+                <a href="{% url 'admin:index' %}" class="btn btn-outline-warning btn-sm me-2">لوحة الإدارة</a>
+                <a href="{% url 'admin_statistics' %}" class="btn btn-outline-warning btn-sm me-2">الإحصائيات</a>
+                {% endif %}
+                
+                <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm">تسجيل الخروج</button>
+                </form>
+            {% else %}
+                <!-- <a href="{% url 'login' %}" class="btn btn-outline-light">تسجيل دخول المعلمين</a> -->
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    {% block content %}
+    {% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const mobileCloseBtn = document.getElementById('mobileCloseBtn');
+const mobileSidebar = document.getElementById('mobileSidebar');
+const mobileOverlay = document.getElementById('mobileOverlay');
+
+function openMobileSidebar() {
+    document.body.classList.add('sidebar-open');
+    mobileSidebar.setAttribute('aria-hidden', 'false');
+    mobileOverlay.setAttribute('aria-hidden', 'false');
+    mobileMenuBtn.setAttribute('aria-expanded', 'true');
+}
+
+function closeMobileSidebar() {
+    document.body.classList.remove('sidebar-open');
+    mobileSidebar.setAttribute('aria-hidden', 'true');
+    mobileOverlay.setAttribute('aria-hidden', 'true');
+    mobileMenuBtn.setAttribute('aria-expanded', 'false');
+}
+
+if (mobileMenuBtn && mobileCloseBtn && mobileSidebar && mobileOverlay) {
+    mobileMenuBtn.addEventListener('click', openMobileSidebar);
+    mobileCloseBtn.addEventListener('click', closeMobileSidebar);
+    mobileOverlay.addEventListener('click', closeMobileSidebar);
+}
+</script>
+
+</body>
+</html>

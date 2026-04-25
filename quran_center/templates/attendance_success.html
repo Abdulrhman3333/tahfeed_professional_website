@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}تم حفظ التحضير{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">تم حفظ التحضير</h1>
+        <p class="page-hero-subtitle">تم حفظ تحضير الطلاب بنجاح</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+    <div class="card shadow text-center">
+        <div class="card-header bg-success text-white">
+            <h3>✅ تم حفظ التحضير بنجاح!</h3>
+        </div>
+        <div class="card-body">
+            <p class="lead">تم حفظ تحضير الطلاب لهذا اليوم.</p>
+            <a href="{% url 'take_attendance' %}" class="btn btn-primary mt-3">العودة للتحضير</a>
+            <a href="{% url 'home' %}" class="btn btn-secondary mt-3">الصفحة الرئيسية</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

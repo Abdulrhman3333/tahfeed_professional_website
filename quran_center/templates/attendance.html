@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% load role_tags %}
+{% block title %}التحضير اليومي{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">التحضير اليومي للطلاب</h1>
+        <p class="page-hero-subtitle">تسجيل الحضور والغياب لهذا اليوم</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+    
+    {% if success %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>نجح!</strong> تم حفظ التحضير بنجاح للتاريخ {{ selected_date|date:"Y/m/d" }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+    {% if students_with_status %}
+    <form method="post">
+        {% csrf_token %}
+        
+        <!-- اختيار التاريخ -->
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5>معلومات التحضير</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">التاريخ:</label>
+                        <input type="date" id="attendance_date_input" name="attendance_date" class="form-control" value="{{ selected_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="col-md-8 d-flex align-items-end">
+                        <div class="alert alert-secondary w-100 mb-0">
+                            اليوم: <strong id="display_weekday">{{ current_weekday }}</strong> | الأسبوع: <strong id="display_week">{{ current_week }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-success w-100">إتمام التحضير وحفظ النتائج</button>
+
+        <!-- جدول الطلاب -->
+        <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>اسم الطالب</th>
+                    <th>الحالة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in students_with_status %}
+                <tr>
+                    <td>{{ item.student.full_name }}</td>
+                    <td>
+                    <input type="hidden" name="status_{{ item.student.id }}" id="input_{{ item.student.id }}" value="{{ item.status }}">
+
+                    <button type="button"
+                        class="btn {% if item.status == 'غائب' %}btn-danger{% elif item.status == 'غياب بعذر' %}btn-dark{% elif item.status == 'مستأذن' %}btn-warning{% elif item.status == 'متأخر' %}btn-secondary{% else %}btn-primary{% endif %}"
+                        onclick="toggleStatus('{{ item.student.id }}')"
+                        id="btn_{{ item.student.id }}">{% if item.status == 'مستأذن' %}منصرف{% else %}{{ item.status }}{% endif %}</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" class="btn btn-success w-100">إتمام التحضير وحفظ النتائج</button>
+    </form>
+    {% else %}
+        <div class="alert alert-info">
+            لا يوجد طلاب مسجلين لك حالياً.
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Mapping of weekdays in Arabic
+const weekdayMap = {
+    0: 'الأحد',       // Sunday
+    1: 'الاثنين',    // Monday
+    2: 'الثلاثاء',   // Tuesday
+    3: 'الأربعاء',   // Wednesday
+    4: 'الخميس',    // Thursday
+    5: 'الجمعة',     // Friday
+    6: 'السبت'       // Saturday
+};
+
+// Calculate week number (ISO week)
+function getWeekNumber(date) {
+    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+    const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+}
+
+// Update display based on date field value
+function updateDayAndWeek() {
+    const dateInput = document.getElementById('attendance_date_input');
+    const dateStr = dateInput.value;
+    if (!dateStr) return;
+    
+    const date = new Date(dateStr + 'T00:00:00');
+    const weekday = weekdayMap[date.getDay()];
+    const week = getWeekNumber(date);
+    
+    document.getElementById('display_weekday').textContent = weekday;
+    document.getElementById('display_week').textContent = week;
+}
+
+// Update day and week when date changes
+document.getElementById('attendance_date_input').addEventListener('change', function() {
+    updateDayAndWeek();
+    // إعادة تحميل البيانات للتاريخ الجديد بواسطة GET request
+    const form = document.querySelector('form');
+    const dateValue = this.value;
+    window.location.href = `?date=${dateValue}`;
+});
+
+// Update on page load to show today's correct day and week
+document.addEventListener('DOMContentLoaded', updateDayAndWeek);
+
+function toggleStatus(id) {
+    const btn = document.getElementById('btn_' + id);
+    const input = document.getElementById('input_' + id);
+    
+    if (input.value === 'حاضر') {
+        input.value = 'غائب';
+        btn.innerText = 'غائب';
+        btn.className = 'btn btn-danger';
+    } else if (input.value === 'غائب') {
+        input.value = 'غياب بعذر';
+        btn.innerText = 'غياب بعذر';
+        btn.className = 'btn btn-dark';
+    } else if (input.value === 'غياب بعذر') {
+        input.value = 'مستأذن';
+        btn.innerText = 'منصرف';
+        btn.className = 'btn btn-warning';
+    } else if (input.value === 'مستأذن') {
+        input.value = 'متأخر';
+        btn.innerText = 'متأخر';
+        btn.className = 'btn btn-secondary';
+    } else {
+        input.value = 'حاضر';
+        btn.innerText = 'حاضر';
+        btn.className = 'btn btn-primary';
+    }
+}
+</script>
+{% endblock %}

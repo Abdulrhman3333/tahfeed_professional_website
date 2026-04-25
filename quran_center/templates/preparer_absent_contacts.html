@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}أرقام الغياب{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">أرقام الغياب</h1>
+        <p class="page-hero-subtitle">نسخ أرقام أولياء الأمور والمتابعة بسهولة</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+
+    {% if sms_feedback %}
+    <div class="alert {% if sms_feedback.failed_count == 0 %}alert-success{% else %}alert-warning{% endif %}">
+        تم الإرسال لقسم {{ sms_feedback.section }}: نجح {{ sms_feedback.success_count }} وفشل {{ sms_feedback.failed_count }}.
+        {% if sms_feedback.failures %}
+            <br>
+            أول الأخطاء: {{ sms_feedback.failures|join:' | ' }}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if template_save_feedback %}
+    <div class="alert alert-success">
+        {{ template_save_feedback }}
+    </div>
+    {% endif %}
+
+    <form method="get" class="mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">اختر التاريخ:</label>
+                <input type="date" name="date" class="form-control" value="{{ target_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">عرض</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">أرقام أولياء أمور الغائبين ({{ absent_phones_count }})</div>
+        <div class="card-body">
+            <textarea id="absentPhonesText" class="form-control" rows="5" readonly>{{ absent_phones_text }}</textarea>
+            <form method="post" class="mt-3">
+                {% csrf_token %}
+                <input type="hidden" name="date" value="{{ target_date|date:'Y-m-d' }}">
+                <input type="hidden" name="sms_action" value="absent">
+                <label class="form-label">قالب رسالة الغياب</label>
+                <textarea name="absent_sms_template" class="form-control" rows="3">{{ absent_sms_template }}</textarea>
+                <small class="text-muted">المتغيرات المتاحة: &#123;&#123;&#123;الاسم_الأول&#125;&#125;&#125; &#123;&#123;&#123;اليوم&#125;&#125;&#125; &#123;&#123;&#123;التاريخ&#125;&#125;&#125; &#123;&#123;&#123;المجموع&#125;&#125;&#125; &#123;&#123;&#123;اسم_المعلم&#125;&#125;&#125; &#123;&#123;&#123;جوال_المعلم&#125;&#125;&#125; (وتدعم أيضاً: &#123;&#123;&#123;total_days&#125;&#125;&#125; &#123;&#123;&#123;teacher_name&#125;&#125;&#125; &#123;&#123;&#123;teacher_phone&#125;&#125;&#125;)</small>
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button type="button" class="btn btn-danger" onclick="copyPhones('absentPhonesText')">نسخ أرقام الغائبين</button>
+                    <button type="submit" name="save_templates" value="1" class="btn btn-outline-primary">حفظ القالب</button>
+                    <button type="submit" class="btn btn-outline-danger">إرسال رسائل الغائبين الآن</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">أرقام أولياء أمور الغائبين بعذر ({{ absent_excused_phones_count }})</div>
+        <div class="card-body">
+            <textarea id="absentExcusedPhonesText" class="form-control" rows="5" readonly>{{ absent_excused_phones_text }}</textarea>
+            <form method="post" class="mt-3">
+                {% csrf_token %}
+                <input type="hidden" name="date" value="{{ target_date|date:'Y-m-d' }}">
+                <input type="hidden" name="sms_action" value="absent_excused">
+                <label class="form-label">قالب رسالة الغياب بعذر</label>
+                <textarea name="absent_excused_sms_template" class="form-control" rows="3">{{ absent_excused_sms_template }}</textarea>
+                <small class="text-muted">المتغيرات المتاحة: &#123;&#123;&#123;الاسم_الأول&#125;&#125;&#125; &#123;&#123;&#123;اليوم&#125;&#125;&#125; &#123;&#123;&#123;التاريخ&#125;&#125;&#125; &#123;&#123;&#123;المجموع&#125;&#125;&#125; &#123;&#123;&#123;اسم_المعلم&#125;&#125;&#125; &#123;&#123;&#123;جوال_المعلم&#125;&#125;&#125; (وتدعم أيضاً: &#123;&#123;&#123;total_days&#125;&#125;&#125; &#123;&#123;&#123;teacher_name&#125;&#125;&#125; &#123;&#123;&#123;teacher_phone&#125;&#125;&#125;)</small>
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button type="button" class="btn btn-dark" onclick="copyPhones('absentExcusedPhonesText')">نسخ أرقام الغياب بعذر</button>
+                    <button type="submit" name="save_templates" value="1" class="btn btn-outline-primary">حفظ القالب</button>
+                    <button type="submit" class="btn btn-outline-dark">إرسال رسائل الغياب بعذر الآن</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">أرقام أولياء أمور المتأخرين ({{ late_phones_count }})</div>
+        <div class="card-body">
+            <textarea id="latePhonesText" class="form-control" rows="5" readonly>{{ late_phones_text }}</textarea>
+            <form method="post" class="mt-3">
+                {% csrf_token %}
+                <input type="hidden" name="date" value="{{ target_date|date:'Y-m-d' }}">
+                <input type="hidden" name="sms_action" value="late">
+                <label class="form-label">قالب رسالة التأخر</label>
+                <textarea name="late_sms_template" class="form-control" rows="3">{{ late_sms_template }}</textarea>
+                <small class="text-muted">المتغيرات المتاحة: &#123;&#123;&#123;الاسم_الأول&#125;&#125;&#125; &#123;&#123;&#123;اليوم&#125;&#125;&#125; &#123;&#123;&#123;التاريخ&#125;&#125;&#125; &#123;&#123;&#123;المجموع&#125;&#125;&#125; &#123;&#123;&#123;اسم_المعلم&#125;&#125;&#125; &#123;&#123;&#123;جوال_المعلم&#125;&#125;&#125; (وتدعم أيضاً: &#123;&#123;&#123;total_days&#125;&#125;&#125; &#123;&#123;&#123;teacher_name&#125;&#125;&#125; &#123;&#123;&#123;teacher_phone&#125;&#125;&#125;)</small>
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button type="button" class="btn btn-secondary" onclick="copyPhones('latePhonesText')">نسخ أرقام المتأخرين</button>
+                    <button type="submit" name="save_templates" value="1" class="btn btn-outline-primary">حفظ القالب</button>
+                    <button type="submit" class="btn btn-outline-secondary">إرسال رسائل المتأخرين الآن</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-warning">أرقام أولياء أمور المنصرفين ({{ excused_phones_count }})</div>
+        <div class="card-body">
+            <textarea id="excusedPhonesText" class="form-control" rows="5" readonly>{{ excused_phones_text }}</textarea>
+            <form method="post" class="mt-3">
+                {% csrf_token %}
+                <input type="hidden" name="date" value="{{ target_date|date:'Y-m-d' }}">
+                <input type="hidden" name="sms_action" value="excused">
+                <label class="form-label">قالب رسالة الانصراف</label>
+                <textarea name="excused_sms_template" class="form-control" rows="3">{{ excused_sms_template }}</textarea>
+                <small class="text-muted">المتغيرات المتاحة: &#123;&#123;&#123;الاسم_الأول&#125;&#125;&#125; &#123;&#123;&#123;اليوم&#125;&#125;&#125; &#123;&#123;&#123;التاريخ&#125;&#125;&#125; &#123;&#123;&#123;المجموع&#125;&#125;&#125; &#123;&#123;&#123;اسم_المعلم&#125;&#125;&#125; &#123;&#123;&#123;جوال_المعلم&#125;&#125;&#125; (وتدعم أيضاً: &#123;&#123;&#123;total_days&#125;&#125;&#125; &#123;&#123;&#123;teacher_name&#125;&#125;&#125; &#123;&#123;&#123;teacher_phone&#125;&#125;&#125;)</small>
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button type="button" class="btn btn-warning" onclick="copyPhones('excusedPhonesText')">نسخ أرقام المنصرفين</button>
+                    <button type="submit" name="save_templates" value="1" class="btn btn-outline-primary">حفظ القالب</button>
+                    <button type="submit" class="btn btn-outline-warning">إرسال رسائل المنصرفين الآن</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-warning">الطلاب الغائبون أكثر من 5 أيام</div>
+        <div class="card-body">
+            {% if at_risk %}
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>اسم الطالب</th>
+                            <th>عدد الغياب المؤقت</th>
+                            <th>الإجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in at_risk %}
+                        <tr>
+                            <td>
+                                {{ item.student.full_name }}
+                                <span class="badge bg-secondary ms-2">إجمالي الغياب: {{ item.total_absences }}</span>
+                            </td>
+                            <td>{{ item.temp_count }}</td>
+                            <td>
+                                <form method="post" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="reset_student_id" value="{{ item.student.id }}">
+                                    <input type="hidden" name="date" value="{{ target_date|date:'Y-m-d' }}">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">تصفير بعد التواصل</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">لا يوجد طلاب تجاوزوا 5 أيام حالياً.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function copyPhones(elementId) {
+    const text = document.getElementById(elementId);
+    if (!text) {
+        return;
+    }
+    text.select();
+    text.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(text.value);
+}
+</script>
+{% endblock %}

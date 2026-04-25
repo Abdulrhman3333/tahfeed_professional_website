@@ -1,0 +1,37 @@
+from django.urls import path
+from django.contrib.auth import views as auth_views
+from . import views
+
+urlpatterns = [
+    path('', views.welcome_view, name='welcome'),
+    path('register/', views.home, name='home'),
+    path('register/bulk-upload/', views.bulk_students_upload, name='bulk_students_upload'),
+    path('parent-inquiry/', views.parent_inquiry, name='parent_inquiry'),
+    path('success/', views.success_view, name='success'),
+    path('pending/', views.pending_students, name='pending_students'),
+    path('stage-students/', views.stage_students_data, name='stage_students_data'),
+    path('attendance/', views.take_attendance, name='take_attendance'),
+    path('attendance/update/', views.update_attendance, name='update_attendance'),
+    path('attendance/success/', views.attendance_success_view, name='attendance_success'),
+    path('teacher-dashboard/', views.teacher_dashboard, name='teacher_dashboard'),
+    path('teacher-students-data/', views.teacher_students_data, name='teacher_students_data'),
+    path('teacher-students-data/<int:student_id>/delete/', views.delete_teacher_student, name='delete_teacher_student'),
+    path('teacher-students-data/<int:student_id>/plan/', views.teacher_student_plan, name='teacher_student_plan'),
+    path('nominate-exam/', views.nominate_for_exam, name='nominate_exam'),
+    path('teacher-nominations/', views.teacher_nominations, name='teacher_nominations'),
+    path('teacher-nominations/<int:nomination_id>/delete/', views.delete_nomination, name='delete_nomination'),
+    path('nominated-students/', views.nominated_students, name='nominated_students'),
+    path('pending/<int:student_id>/delete/', views.delete_pending_student, name='delete_pending_student'),
+    path('association-candidates/', views.association_candidates, name='association_candidates'),
+    path('association-results/', views.association_results, name='association_results'),
+    path('preparer-attendance/', views.preparer_attendance_summary, name='preparer_attendance_summary'),
+    path('preparer-attendance/take/', views.preparer_take_attendance, name='preparer_take_attendance'),
+    path('preparer-attendance/students/', views.preparer_take_students_attendance, name='preparer_take_students_attendance'),
+    path('preparer-absent-contacts/', views.preparer_absent_contacts, name='preparer_absent_contacts'),
+    path('superuser/memorization-templates/upload/', views.superuser_template_upload, name='superuser_template_upload'),
+    path('memorization-templates/active-bundle/', views.active_memorization_bundle_api, name='active_memorization_bundle_api'),
+    path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('admin-statistics/', views.admin_statistics, name='admin_statistics'),
+    path('login/', views.TeacherLoginView.as_view(), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='welcome'), name='logout'),
+]

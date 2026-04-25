@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}مرشحو اختبار الجمعية{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">مرشحو اختبار الجمعية</h1>
+        <p class="page-hero-subtitle">إدخال درجات اختبار الجمعية للطلاب المرشحين</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+
+    {% if sms_feedback %}
+    <div class="alert {% if sms_feedback.failed_count == 0 %}alert-success{% else %}alert-warning{% endif %}">
+        تم إرسال رسائل مرشحي الجمعية: نجح {{ sms_feedback.success_count }} وفشل {{ sms_feedback.failed_count }}.
+        {% if sms_feedback.failures %}
+            <br>
+            أول الأخطاء: {{ sms_feedback.failures|join:' | ' }}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if template_save_feedback %}
+    <div class="alert alert-success">
+        {{ template_save_feedback }}
+    </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">رسالة أولياء أمور مرشحي اختبار الجمعية</div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="selected_nomination_ids_csv" id="selectedNominationIdsCsv" value="">
+                <label class="form-label">قالب رسالة الاختبار</label>
+                <textarea name="association_sms_template" class="form-control" rows="10">{{ association_sms_template }}</textarea>
+                <small class="text-muted">المتغيرات المتاحة: &#123;&#123;&#123;الاسم_الأول&#125;&#125;&#125; و &#123;&#123;&#123;رقم_الجزء&#125;&#125;&#125; (وتدعم أيضاً: &#123;&#123;&#123;first_name&#125;&#125;&#125; و &#123;&#123;&#123;part_number&#125;&#125;&#125;)</small>
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button type="submit" name="form_action" value="save_association_sms_template" class="btn btn-outline-primary">حفظ القالب</button>
+                    <button type="submit" name="form_action" value="send_association_sms" class="btn btn-primary" onclick="return prepareAssociationSmsSend();">إرسال الرسائل الآن</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if nominations %}
+    <form method="post">
+        {% csrf_token %}
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>اسم الطالب</th>
+                        <th>الجزء المراد اختباره</th>
+                        <th>درجة المعلم</th>
+                        <th>درجة الاختبار الداخلي</th>
+                        <th>درجة اختبار الجمعية</th>
+                        <th>حذف</th>
+                        <th>إرسال SMS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in nominations %}
+                    <tr>
+                        <td>{{ item.nomination.student.full_name }}</td>
+                        <td><span class="badge bg-success">{{ item.next_part }}</span></td>
+                        <td><span class="badge bg-info">{{ item.nomination.teacher_grade|floatformat:2 }}</span></td>
+                        <td><span class="badge bg-info">{{ item.nomination.internal_grade|floatformat:2 }}</span></td>
+                        <td>
+                            <input type="number"
+                                   name="association_grade_{{ item.nomination.id }}"
+                                   class="form-control"
+                                   placeholder="أدخل الدرجة"
+                                   min="0"
+                                   max="100"
+                                   step="0.5">
+                        </td>
+                        <td>
+                            <button type="submit"
+                                    class="btn btn-outline-danger btn-sm"
+                                    formaction="{% url 'delete_nomination' item.nomination.id %}"
+                                    formmethod="post"
+                                    formnovalidate
+                                    name="next"
+                                    value="{% url 'association_candidates' %}"
+                                    onclick="return confirm('هل تريد حذف هذا الترشيح؟');">
+                                حذف
+                            </button>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input association-sms-checkbox" value="{{ item.nomination.id }}" checked>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-lg w-100 mt-3">
+            حفظ النتائج
+        </button>
+    </form>
+    {% else %}
+    <div class="alert alert-info">
+        لا يوجد مرشحون لاختبار الجمعية حالياً.
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function prepareAssociationSmsSend() {
+    const checkedBoxes = document.querySelectorAll('.association-sms-checkbox:checked');
+    const selectedIds = Array.from(checkedBoxes).map((checkbox) => checkbox.value).filter(Boolean);
+    const hiddenInput = document.getElementById('selectedNominationIdsCsv');
+
+    if (!hiddenInput) {
+        return false;
+    }
+
+    hiddenInput.value = selectedIds.join(',');
+
+    if (selectedIds.length === 0) {
+        alert('الرجاء تحديد طالب واحد على الأقل لإرسال الرسائل.');
+        return false;
+    }
+
+    return true;
+}
+</script>
+{% endblock %}

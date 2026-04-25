@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}بيانات الطلاب{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+	<div class="page-hero-inner">
+		<h1 class="page-hero-title">بيانات الطلاب</h1>
+		<p class="page-hero-subtitle">عرض بيانات طلاب المعلم وإعداد تفضيلات الخطة</p>
+	</div>
+</div>
+
+<div class="container" dir="rtl">
+	<div class="card mb-4">
+		<div class="card-header bg-primary text-white">تفضيلات الخطة الافتراضية للمعلم</div>
+		<div class="card-body">
+			<form method="post" class="row g-3 align-items-end">
+				{% csrf_token %}
+				<div class="col-md-4">
+					<label for="mem_plan" class="form-label">نوع الحفظ</label>
+					<select id="mem_plan" name="mem_plan" class="form-select">
+						<option value="none" {% if preference.mem_plan == 'none' %}selected{% endif %}>مراجعة فقط</option>
+						<option value="2" {% if preference.mem_plan == '2' %}selected{% endif %}>صفحتان</option>
+						<option value="1" {% if preference.mem_plan == '1' %}selected{% endif %}>صفحة</option>
+						<option value="0.5" {% if preference.mem_plan == '0.5' %}selected{% endif %}>نصف صفحة</option>
+						<option value="0.25" {% if preference.mem_plan == '0.25' %}selected{% endif %}>ربع صفحة</option>
+					</select>
+				</div>
+				<div class="col-md-4">
+					<label for="big_review_pages" class="form-label">عدد صفحات المراجعة الكبرى</label>
+					<input
+						id="big_review_pages"
+						name="big_review_pages"
+						type="number"
+						min="1"
+						class="form-control"
+						value="{{ preference.big_review_pages }}"
+					>
+				</div>
+				<div class="col-md-4">
+					<button type="submit" class="btn btn-success w-100">حفظ التفضيلات</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<div class="d-flex flex-wrap gap-2 mb-3">
+		<button type="button" class="btn btn-outline-primary" onclick="copyTeacherStudentNames()">نسخ أسماء جميع طلاب الحلقة</button>
+	</div>
+
+	{% if students_data %}
+	<div class="table-responsive">
+		<table class="table table-bordered table-hover">
+			<thead class="table-dark">
+				<tr>
+					<th>إنشاء خطة</th>
+					<th>اسم الطالب</th>
+					<th>عدد الاجزاء</th>
+					<th>رقم جوال ولي الامر</th>
+					<th>رقم جوال الطالب</th>
+					<th>حذف الطالب</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for item in students_data %}
+				<tr>
+					<td>
+						<a href="{% url 'teacher_student_plan' item.student.id %}" class="btn btn-outline-primary btn-sm">
+							إنشاء خطة
+						</a>
+					</td>
+					<td>{{ item.student.full_name }}</td>
+					<td>{{ item.parts_count }}</td>
+					<td>{{ item.student.parent_phone|default:'-' }}</td>
+					<td>{{ item.student.student_phone|default:'-' }}</td>
+					<td>
+						<form method="post" action="{% url 'delete_teacher_student' item.student.id %}" onsubmit="return confirm('هل تريد حذف هذا الطالب من الحلقة؟');" style="display:inline;">
+							{% csrf_token %}
+							<button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+						</form>
+					</td>
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+	{% else %}
+	<div class="alert alert-info">لا يوجد طلاب منتظمون لهذا المعلم حالياً.</div>
+	{% endif %}
+
+	<textarea id="teacherStudentsNamesText" style="position:absolute; left:-9999px; top:0; opacity:0;" aria-hidden="true">{% for item in students_data %}{{ item.student.full_name }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+
+	<script>
+	function copyTeacherStudentNames() {
+		const source = document.getElementById('teacherStudentsNamesText');
+		if (!source) return;
+
+		const text = (source.value || '').trim();
+		if (!text) {
+			alert('لا توجد أسماء متاحة للنسخ.');
+			return;
+		}
+
+		navigator.clipboard.writeText(text)
+			.then(() => alert('تم نسخ أسماء جميع طلاب الحلقة بنجاح.'))
+			.catch(() => alert('تعذر نسخ الأسماء تلقائياً.'));
+	}
+	</script>
+</div>
+{% endblock %}
