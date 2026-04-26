@@ -51,9 +51,6 @@ class TeacherLoginView(LoginView):
         remember_me = self.request.POST.get('remember_me') == 'on'
         username = form.cleaned_data.get('username', '')
 
-        # Keep user logged in for a long period by default after first login.
-        self.request.session.set_expiry(60 * 60 * 24 * 30)
-
         if remember_me:
             # Cookie values must be ASCII-safe; encode to avoid crashes with Arabic usernames.
             safe_username = quote(username, safe='')

@@ -48,7 +48,7 @@
 	</div>
 
 	{% if students_data %}
-	<div class="table-responsive">
+	<div class="table-responsive d-none d-md-block">
 		<table class="table table-bordered table-hover">
 			<thead class="table-dark">
 				<tr>
@@ -83,6 +83,39 @@
 			</tbody>
 		</table>
 	</div>
+
+	<div class="d-md-none">
+		{% for item in students_data %}
+		<div class="card mb-3 teacher-student-card">
+			<div class="card-body">
+				<h6 class="card-title fw-bold mb-3">{{ item.student.full_name }}</h6>
+
+				<div class="row g-3 mb-3">
+					<div class="col-6">
+						<small class="text-muted d-block">عدد الاجزاء</small>
+						<strong>{{ item.parts_count }}</strong>
+					</div>
+					<div class="col-6">
+						<small class="text-muted d-block">رقم جوال ولي الامر</small>
+						<strong>{{ item.student.parent_phone|default:'-' }}</strong>
+					</div>
+					<div class="col-12">
+						<small class="text-muted d-block">رقم جوال الطالب</small>
+						<strong>{{ item.student.student_phone|default:'-' }}</strong>
+					</div>
+				</div>
+
+				<div class="d-grid gap-2">
+					<a href="{% url 'teacher_student_plan' item.student.id %}" class="btn btn-outline-primary btn-sm">إنشاء خطة</a>
+					<form method="post" action="{% url 'delete_teacher_student' item.student.id %}" onsubmit="return confirm('هل تريد حذف هذا الطالب من الحلقة؟');">
+						{% csrf_token %}
+						<button type="submit" class="btn btn-outline-danger btn-sm w-100">حذف الطالب</button>
+					</form>
+				</div>
+			</div>
+		</div>
+		{% endfor %}
+	</div>
 	{% else %}
 	<div class="alert alert-info">لا يوجد طلاب منتظمون لهذا المعلم حالياً.</div>
 	{% endif %}
@@ -107,4 +140,34 @@
 	}
 	</script>
 </div>
+
+<style>
+@media (max-width: 767px) {
+	.page-hero {
+		padding: 1.5rem 1rem;
+		margin: 0.75rem 0 1.25rem;
+	}
+
+	.page-hero-title {
+		font-size: 1.4rem;
+	}
+
+	.page-hero-subtitle {
+		font-size: 0.95rem;
+	}
+
+	.teacher-student-card {
+		border-right: 4px solid #5B8FBE;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	}
+
+	.teacher-student-card .card-body {
+		padding: 1.1rem;
+	}
+
+	.teacher-student-card .btn {
+		width: 100%;
+	}
+}
+</style>
 {% endblock %}
