@@ -87,13 +87,14 @@ def can_access_preparer_attendance(user):
 
 
 ARABIC_WEEKDAY_NAMES = {
-    0: 'الأحد',
-    1: 'الاثنين',
-    2: 'الثلاثاء',
-    3: 'الأربعاء',
-    4: 'الخميس',
-    5: 'الجمعة',
-    6: 'السبت',
+    # Python's date.weekday() starts from Monday=0 to Sunday=6.
+    0: 'الاثنين',
+    1: 'الثلاثاء',
+    2: 'الأربعاء',
+    3: 'الخميس',
+    4: 'الجمعة',
+    5: 'السبت',
+    6: 'الأحد',
 }
 
 
