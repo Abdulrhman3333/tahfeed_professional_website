@@ -21,7 +21,7 @@
                     <label class="form-label">إلى تاريخ</label>
                     <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
                 </div>
-                <div class="col-md-4 d-flex gap-2">
+                <div class="col-md-4 d-flex gap-2 flex-wrap">
                     <button type="submit" class="btn btn-primary">تطبيق الفلتر</button>
                     <a href="{% url 'stage_students_data' %}" class="btn btn-outline-secondary">إلغاء</a>
                 </div>
@@ -161,7 +161,7 @@
 }
 </style>
 
-<textarea id="stageStudentsNamesText" style="position:absolute; left:-9999px; top:0; opacity:0;" aria-hidden="true">{% for student in students %}{{ student.full_name }}{% if not forloop.last %}
+<textarea id="stageStudentsNamesText" style="position:fixed; width:1px; height:1px; opacity:0; top:-100vh; left:0; pointer-events:none;" aria-hidden="true">{% for student in students %}{{ student.full_name }}{% if not forloop.last %}
 {% endif %}{% endfor %}</textarea>
 
 <script>
