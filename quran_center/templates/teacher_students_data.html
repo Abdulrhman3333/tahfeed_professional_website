@@ -120,7 +120,7 @@
 	<div class="alert alert-info">لا يوجد طلاب منتظمون لهذا المعلم حالياً.</div>
 	{% endif %}
 
-	<textarea id="teacherStudentsNamesText" style="position:absolute; left:-9999px; top:0; opacity:0;" aria-hidden="true">{% for item in students_data %}{{ item.student.full_name }}{% if not forloop.last %}
+	<textarea id="teacherStudentsNamesText" class="copy-buffer" aria-hidden="true">{% for item in students_data %}{{ item.student.full_name }}{% if not forloop.last %}
 {% endif %}{% endfor %}</textarea>
 
 	<script>
@@ -142,6 +142,19 @@
 </div>
 
 <style>
+.copy-buffer {
+	position: fixed;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: 0;
+	border: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
 @media (max-width: 767px) {
 	.page-hero {
 		padding: 1.5rem 1rem;
