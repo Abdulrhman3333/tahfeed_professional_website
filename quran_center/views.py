@@ -742,14 +742,7 @@ def take_attendance(request):
         selected_date = today
     
     # تحديد اليوم بالعربي
-    weekday_map = {
-        6: 'الأحد',      # Sunday
-        0: 'الاثنين',    # Monday
-        1: 'الثلاثاء',   # Tuesday
-        2: 'الأربعاء',   # Wednesday
-        3: 'الخميس',    # Thursday
-    }
-    current_weekday = weekday_map.get(selected_date.weekday(), 'الأحد')
+    current_weekday = get_arabic_weekday_name(selected_date)
     
     # الحصول على رقم الأسبوع من التقويم
     current_week = AcademicCalendar.get_week_from_date(selected_date)
@@ -762,7 +755,7 @@ def take_attendance(request):
         except ValueError:
             posted_date = selected_date
 
-        selected_weekday = weekday_map.get(posted_date.weekday(), 'الأحد')
+        selected_weekday = get_arabic_weekday_name(posted_date)
         selected_week = AcademicCalendar.get_week_from_date(posted_date)
         
         for student in students:
@@ -1877,10 +1870,12 @@ def preparer_absent_contacts(request):
                 status='غائب'
             ).count()
         if temp_count >= 5:
+            parent_phone = normalize_saudi_phone(student.parent_phone)
             at_risk.append({
                 'student': student,
                 'temp_count': temp_count,
                 'total_absences': total_absences,
+                'parent_phone': parent_phone,
             })
 
     context = {

@@ -129,6 +129,7 @@
                         <tr>
                             <th>اسم الطالب</th>
                             <th>عدد الغياب المؤقت</th>
+                            <th>رقم ولي الأمر</th>
                             <th>الإجراء</th>
                         </tr>
                     </thead>
@@ -140,6 +141,17 @@
                                 <span class="badge bg-secondary ms-2">إجمالي الغياب: {{ item.total_absences }}</span>
                             </td>
                             <td>{{ item.temp_count }}</td>
+                            <td>
+                                {% if item.parent_phone %}
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm"
+                                        onclick="copyParentPhone('{{ item.parent_phone|escapejs }}', this)">
+                                    {{ item.parent_phone }}
+                                </button>
+                                {% else %}
+                                <span class="text-muted">غير متوفر</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <form method="post" style="display:inline;">
                                     {% csrf_token %}
@@ -169,6 +181,26 @@ function copyPhones(elementId) {
     text.select();
     text.setSelectionRange(0, 99999);
     navigator.clipboard.writeText(text.value);
+}
+
+function copyParentPhone(phoneNumber, button) {
+    const value = (phoneNumber || '').trim();
+    if (!value) {
+        alert('لا يوجد رقم متاح للنسخ.');
+        return;
+    }
+
+    navigator.clipboard.writeText(value)
+        .then(() => {
+            if (button) {
+                const originalText = button.textContent;
+                button.textContent = 'تم النسخ';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 1200);
+            }
+        })
+        .catch(() => alert('تعذر نسخ الرقم تلقائياً.'));
 }
 </script>
 {% endblock %}
