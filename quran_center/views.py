@@ -1871,6 +1871,8 @@ def preparer_absent_contacts(request):
             ).count()
         if temp_count >= 5:
             parent_phone = normalize_saudi_phone(student.parent_phone)
+            if parent_phone.startswith('966'):
+                parent_phone = '0' + parent_phone[3:]
             at_risk.append({
                 'student': student,
                 'temp_count': temp_count,

@@ -13,18 +13,15 @@ class StudentRegistrationForm(forms.ModelForm):
         model = Student
         # نختار الحقول التي يدخلها الطالب فقط (الحالة والمرحلة تُحسب تلقائياً)
         fields = [
-            'full_name', 'student_phone', 'parent_phone', 'identity_number', 
-            'parent_identity', 'grade', 'birth_date', 'last_tested_part', 
-            'previous_center', 'neighborhood'
+            'full_name', 'student_phone', 'parent_phone', 'identity_number',
+            'grade', 'last_tested_part', 'previous_center', 'neighborhood'
         ]
         widgets = {
             'full_name': forms.TextInput(attrs={'class': 'form-control'}),
             'student_phone': forms.TextInput(attrs={'class': 'form-control'}),
             'parent_phone': forms.TextInput(attrs={'class': 'form-control'}),
             'identity_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'parent_identity': forms.TextInput(attrs={'class': 'form-control'}),
             'grade': forms.Select(attrs={'class': 'form-select'}),
-            'birth_date': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'مثال: 15/04/2012'}),
             'previous_center': forms.TextInput(attrs={'class': 'form-control'}),
             'neighborhood': forms.TextInput(attrs={'class': 'form-control'}),
         }
