@@ -580,6 +580,85 @@ def send_batch_messages(rows, template_text):
         'failures': failures[:5],
     }
 
+
+def send_whatsapp_batch(messages):
+    """Send a list of {phone, text, label} via the local whatsapp-web.js bot.
+
+    Returns a summary dict similar to send_batch_messages.
+    """
+    bot_url = (getattr(settings, 'WHATSAPP_BOT_URL', '') or '').strip()
+    if not bot_url:
+        return {
+            'success_count': 0,
+            'failed_count': len(messages),
+            'failures': ['WHATSAPP_BOT_URL is not configured.'],
+        }
+
+    bot_token = getattr(settings, 'WHATSAPP_BOT_TOKEN', '') or ''
+    timeout = getattr(settings, 'WHATSAPP_BOT_TIMEOUT', 600)
+    min_delay_ms = getattr(settings, 'WHATSAPP_MIN_DELAY_MS', 4000)
+    max_delay_ms = getattr(settings, 'WHATSAPP_MAX_DELAY_MS', 12000)
+
+    payload = {
+        'messages': messages,
+        'min_delay_ms': min_delay_ms,
+        'max_delay_ms': max_delay_ms,
+    }
+    body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+    endpoint = bot_url.rstrip('/') + '/send'
+
+    req = urlrequest.Request(
+        endpoint,
+        data=body,
+        headers={
+            'Content-Type': 'application/json; charset=utf-8',
+            'X-Bot-Token': bot_token,
+        },
+        method='POST',
+    )
+
+    try:
+        with urlrequest.urlopen(req, timeout=timeout) as response:
+            raw = response.read().decode('utf-8') or '{}'
+            data = json.loads(raw)
+    except HTTPError as e:
+        return {
+            'success_count': 0,
+            'failed_count': len(messages),
+            'failures': [f'WhatsApp bot HTTP {e.code}: {e.reason}'],
+        }
+    except (URLError, TimeoutError) as e:
+        return {
+            'success_count': 0,
+            'failed_count': len(messages),
+            'failures': [f'WhatsApp bot unreachable: {e}'],
+        }
+    except json.JSONDecodeError:
+        return {
+            'success_count': 0,
+            'failed_count': len(messages),
+            'failures': ['WhatsApp bot returned invalid JSON.'],
+        }
+
+    results = data.get('results', []) if isinstance(data, dict) else []
+    success_count = sum(1 for r in results if r.get('ok'))
+    failed_count = sum(1 for r in results if not r.get('ok'))
+    failures = []
+    for r in results:
+        if r.get('ok'):
+            continue
+        label = r.get('label') or r.get('phone') or '?'
+        failures.append(f"{label}: {r.get('error') or 'unknown'}")
+        if len(failures) >= 10:
+            break
+
+    return {
+        'success_count': success_count,
+        'failed_count': failed_count,
+        'failures': failures,
+    }
+
+
 @login_required
 def pending_students(request):
     """صفحة الطلاب المنتظرين - للمشرفين فقط"""
@@ -1358,7 +1437,7 @@ def association_candidates(request):
     if not user_has_role(request.user, 'examiner'):
         return redirect('home')
 
-    nominations = ExamNomination.objects.filter(internal_passed=True, association_tested=False).select_related('student', 'exam_halaqa_teacher').order_by('student__full_name', '-id')
+    nominations = ExamNomination.objects.filter(internal_passed=True, association_tested=False).select_related('student', 'student__teacher', 'exam_halaqa_teacher').order_by('student__full_name', '-id')
 
     halaqa_profiles = TeacherProfile.objects.filter(
         class_name__isnull=False
@@ -1379,15 +1458,31 @@ def association_candidates(request):
         "نرجو الالتزام بالموعد المحدد"
     )
 
+    default_teacher_template = (
+        "السلام عليكم ورحمة الله وبركاته\n\n"
+        "نذكركم بأن طالبكم {{{الاسم_الأول}}} مرشح لاختبار جزء {{{رقم_الجزء}}} في جمعية خيركم.\n\n"
+        "بارك الله فيكم"
+    )
+
     saved_sms_template = SmsTemplateSetting.objects.filter(
         user=request.user,
         section='association_exam'
+    ).values_list('template_text', flat=True).first()
+
+    saved_teacher_template = SmsTemplateSetting.objects.filter(
+        user=request.user,
+        section='association_exam_teacher'
     ).values_list('template_text', flat=True).first()
 
     association_sms_template = saved_sms_template or default_sms_template
     posted_sms_template = request.POST.get('association_sms_template')
     if posted_sms_template is not None:
         association_sms_template = posted_sms_template
+
+    association_teacher_sms_template = saved_teacher_template or default_teacher_template
+    posted_teacher_template = request.POST.get('association_teacher_sms_template')
+    if posted_teacher_template is not None:
+        association_teacher_sms_template = posted_teacher_template
 
     sms_feedback = None
     template_save_feedback = None
@@ -1405,6 +1500,16 @@ def association_candidates(request):
             association_sms_template = template_text
             template_save_feedback = 'تم حفظ قالب رسالة اختبار الجمعية بنجاح.'
 
+        elif form_action == 'save_association_teacher_sms_template':
+            template_text = (request.POST.get('association_teacher_sms_template') or '').strip() or default_teacher_template
+            SmsTemplateSetting.objects.update_or_create(
+                user=request.user,
+                section='association_exam_teacher',
+                defaults={'template_text': template_text},
+            )
+            association_teacher_sms_template = template_text
+            template_save_feedback = 'تم حفظ قالب رسالة المعلمين بنجاح.'
+
         elif form_action == 'send_association_sms':
             selected_ids_csv = (request.POST.get('selected_nomination_ids_csv') or '').strip()
             selected_ids = []
@@ -1418,33 +1523,140 @@ def association_candidates(request):
                     except ValueError:
                         continue
 
-            selected_nominations = nominations.filter(id__in=selected_ids) if selected_ids else nominations.none()
+            selected_nominations = list(nominations.filter(id__in=selected_ids)) if selected_ids else []
 
-            nomination_rows = []
-            for nomination in selected_nominations:
-                student = nomination.student
-                phone_number = normalize_saudi_phone(student.parent_phone)
-                first_name = (student.full_name or '').strip().split()[0] if (student.full_name or '').strip() else ''
-                nomination_rows.append({
-                    'first_name': first_name,
-                    'full_name': student.full_name,
-                    'phone_number': phone_number,
-                    'part_number': nomination.get_next_part(),
-                })
-
-            if not nomination_rows:
+            if not selected_nominations:
                 sms_feedback = {
                     'success_count': 0,
                     'failed_count': 0,
                     'failures': ['لم يتم تحديد أي طالب لإرسال الرسالة.'],
                 }
             else:
-                batch_result = send_batch_messages(nomination_rows, association_sms_template)
-                sms_feedback = {
-                    'success_count': batch_result['success_count'],
-                    'failed_count': batch_result['failed_count'],
-                    'failures': batch_result['failures'],
-                }
+                today = timezone.now().date()
+                today_date_str = today.strftime('%Y-%m-%d')
+
+                # Per-recipient buckets so multi-student parents/teachers get one combined message.
+                student_messages = []  # direct-to-student
+                parent_groups = {}     # parent_phone -> list of rendered chunks
+                teacher_groups = {}    # teacher_phone -> list of rendered chunks
+                summary_lines = []
+                student_count = 0
+                parent_recipient_count = 0
+                teacher_recipient_count = 0
+
+                for nomination in selected_nominations:
+                    student = nomination.student
+                    full_name = (student.full_name or '').strip()
+                    first_name = full_name.split()[0] if full_name else ''
+                    part_number = nomination.get_next_part()
+
+                    parent_phone = normalize_saudi_phone(student.parent_phone) if student.parent_phone else ''
+                    student_phone = normalize_saudi_phone(student.student_phone) if student.student_phone else ''
+
+                    teacher_user = student.teacher
+                    teacher_name = ''
+                    teacher_phone = ''
+                    if teacher_user:
+                        teacher_name = (teacher_user.get_full_name() or teacher_user.username or '').strip()
+                        try:
+                            profile = teacher_user.teacher_profile
+                            teacher_phone = normalize_saudi_phone(profile.phone) if profile and profile.phone else ''
+                        except TeacherProfile.DoesNotExist:
+                            teacher_phone = ''
+
+                    halaqa_name = ''
+                    if nomination.exam_halaqa_teacher_id:
+                        try:
+                            halaqa_profile = nomination.exam_halaqa_teacher.teacher_profile
+                            halaqa_name = (halaqa_profile.class_name or '').strip()
+                        except TeacherProfile.DoesNotExist:
+                            halaqa_name = ''
+
+                    parent_row = {
+                        'first_name': first_name,
+                        'full_name': full_name,
+                        'phone_number': parent_phone,
+                        'part_number': part_number,
+                        'today_date': today_date_str,
+                    }
+                    parent_msg = render_message_template(association_sms_template, parent_row)
+
+                    teacher_row = {
+                        'first_name': first_name,
+                        'full_name': full_name,
+                        'phone_number': teacher_phone,
+                        'part_number': part_number,
+                        'teacher_name': teacher_name,
+                        'today_date': today_date_str,
+                    }
+                    teacher_msg = render_message_template(association_teacher_sms_template, teacher_row)
+
+                    if student_phone and parent_msg:
+                        student_messages.append({
+                            'phone': student_phone,
+                            'text': parent_msg,
+                            'label': f'طالب: {full_name}',
+                        })
+                        student_count += 1
+
+                    if parent_phone and parent_msg:
+                        parent_groups.setdefault(parent_phone, []).append(parent_msg)
+
+                    if teacher_phone and teacher_msg:
+                        teacher_groups.setdefault(teacher_phone, []).append(teacher_msg)
+
+                    summary_lines.append(
+                        f"- {full_name or '—'} | جزء {part_number} | حلقة الاختبار: {halaqa_name or '—'} | المعلم: {teacher_name or '—'}"
+                    )
+
+                messages_to_send = []
+                messages_to_send.extend(student_messages)
+
+                joiner = '\n\n———\n\n'
+
+                for phone, chunks in parent_groups.items():
+                    text = chunks[0] if len(chunks) == 1 else joiner.join(chunks)
+                    messages_to_send.append({
+                        'phone': phone,
+                        'text': text,
+                        'label': f'ولي أمر ({len(chunks)} طالب)' if len(chunks) > 1 else 'ولي أمر',
+                    })
+                    parent_recipient_count += 1
+
+                for phone, chunks in teacher_groups.items():
+                    text = chunks[0] if len(chunks) == 1 else joiner.join(chunks)
+                    messages_to_send.append({
+                        'phone': phone,
+                        'text': text,
+                        'label': f'معلم ({len(chunks)} طالب)' if len(chunks) > 1 else 'معلم',
+                    })
+                    teacher_recipient_count += 1
+
+                admin_phone = (getattr(settings, 'WHATSAPP_ADMIN_NUMBER', '') or '').strip()
+                if admin_phone:
+                    summary_text = (
+                        "📋 ملخص رسائل اختبار الجمعية\n"
+                        f"التاريخ: {today_date_str}\n"
+                        f"عدد الطلاب: {len(selected_nominations)}\n"
+                        f"رسائل الطلاب المباشرة: {student_count}\n"
+                        f"عدد أولياء الأمور: {parent_recipient_count}\n"
+                        f"عدد المعلمين: {teacher_recipient_count}\n\n"
+                        "القائمة:\n" + "\n".join(summary_lines)
+                    )
+                    messages_to_send.append({
+                        'phone': admin_phone,
+                        'text': summary_text,
+                        'label': 'ملخص الإدارة',
+                    })
+
+                if not messages_to_send:
+                    sms_feedback = {
+                        'success_count': 0,
+                        'failed_count': 0,
+                        'failures': ['لا توجد أرقام صالحة لإرسال الرسائل.'],
+                    }
+                else:
+                    sms_feedback = send_whatsapp_batch(messages_to_send)
 
         else:
             for nomination in nominations:
@@ -1478,6 +1690,7 @@ def association_candidates(request):
         'nominations': nominations_with_next,
         'halaqa_profiles': halaqa_profiles,
         'association_sms_template': association_sms_template,
+        'association_teacher_sms_template': association_teacher_sms_template,
         'sms_feedback': sms_feedback,
         'template_save_feedback': template_save_feedback,
     })

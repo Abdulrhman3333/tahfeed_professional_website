@@ -331,10 +331,11 @@ class SmsTemplateSetting(models.Model):
         ('late', 'تأخر'),
         ('excused', 'انصراف'),
         ('association_exam', 'اختبار الجمعية'),
+        ('association_exam_teacher', 'اختبار الجمعية - المعلمين'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sms_template_settings', verbose_name="المستخدم")
-    section = models.CharField(max_length=20, choices=SECTION_CHOICES, verbose_name="القسم")
+    section = models.CharField(max_length=30, choices=SECTION_CHOICES, verbose_name="القسم")
     template_text = models.TextField(verbose_name="نص القالب")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="آخر تحديث")
 

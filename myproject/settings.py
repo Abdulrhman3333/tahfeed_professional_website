@@ -159,3 +159,12 @@ SMS_MESSAGE_FIELD = os.getenv('SMS_MESSAGE_FIELD', 'body')
 SMS_SENDER_FIELD = os.getenv('SMS_SENDER_FIELD', 'src')
 SMS_PHONE_IS_ARRAY = os.getenv('SMS_PHONE_IS_ARRAY', 'True').lower() == 'true'
 
+# WhatsApp bot (whatsapp-web.js running on a Raspberry Pi inside the LAN).
+# Django POSTs the batch to {WHATSAPP_BOT_URL}/send with header X-Bot-Token: {WHATSAPP_BOT_TOKEN}.
+WHATSAPP_BOT_URL = os.getenv('WHATSAPP_BOT_URL', '')
+WHATSAPP_BOT_TOKEN = os.getenv('WHATSAPP_BOT_TOKEN', '')
+WHATSAPP_BOT_TIMEOUT = int(os.getenv('WHATSAPP_BOT_TIMEOUT', '600'))
+WHATSAPP_ADMIN_NUMBER = os.getenv('WHATSAPP_ADMIN_NUMBER', '966538914185')
+WHATSAPP_MIN_DELAY_MS = int(os.getenv('WHATSAPP_MIN_DELAY_MS', '4000'))
+WHATSAPP_MAX_DELAY_MS = int(os.getenv('WHATSAPP_MAX_DELAY_MS', '12000'))
+
