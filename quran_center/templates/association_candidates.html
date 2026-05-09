@@ -27,51 +27,7 @@
     </div>
     {% endif %}
 
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-white">رسالة أولياء الأمور والطلاب لمرشحي اختبار الجمعية</div>
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                <label class="form-label">قالب رسالة ولي الأمر / الطالب</label>
-                <textarea name="association_sms_template" class="form-control" rows="10">{{ association_sms_template }}</textarea>
-                <small class="text-muted">المتغيرات المتاحة: &#123;&#123;&#123;الاسم_الأول&#125;&#125;&#125; و &#123;&#123;&#123;رقم_الجزء&#125;&#125;&#125; (وتدعم أيضاً: &#123;&#123;&#123;first_name&#125;&#125;&#125; و &#123;&#123;&#123;part_number&#125;&#125;&#125;)</small>
-                <div class="d-flex gap-2 flex-wrap mt-3">
-                    <button type="submit" name="form_action" value="save_association_sms_template" class="btn btn-outline-primary">حفظ قالب ولي الأمر</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="card mb-4">
-        <div class="card-header bg-info text-white">رسالة معلمي مرشحي اختبار الجمعية</div>
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                <label class="form-label">قالب رسالة المعلم</label>
-                <textarea name="association_teacher_sms_template" class="form-control" rows="6">{{ association_teacher_sms_template }}</textarea>
-                <small class="text-muted">عند وجود عدة طلاب لنفس المعلم سيتم دمج الرسائل في رسالة واحدة. المتغيرات المتاحة: &#123;&#123;&#123;الاسم_الأول&#125;&#125;&#125; و &#123;&#123;&#123;رقم_الجزء&#125;&#125;&#125; و &#123;&#123;&#123;اسم_المعلم&#125;&#125;&#125;</small>
-                <div class="d-flex gap-2 flex-wrap mt-3">
-                    <button type="submit" name="form_action" value="save_association_teacher_sms_template" class="btn btn-outline-info">حفظ قالب المعلم</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="card mb-4">
-        <div class="card-header bg-success text-white">إرسال رسائل واتساب الآن</div>
-        <div class="card-body">
-            <p class="text-muted small mb-3">
-                سيتم إرسال الرسائل عبر واتساب (whatsapp-web.js) لكل طالب محدد في الجدول أدناه إلى:
-                جوال الطالب (إن وُجد) باستخدام قالب ولي الأمر، جوال ولي الأمر، جوال المعلم، بالإضافة إلى ملخص يُرسل لرقم الإدارة.
-                ولي الأمر أو المعلم الذي يملك أكثر من طالب سيستلم رسالة واحدة مدمجة.
-            </p>
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="selected_nomination_ids_csv" id="selectedNominationIdsCsv" value="">
-                <button type="submit" name="form_action" value="send_association_sms" class="btn btn-success btn-lg" onclick="return prepareAssociationSmsSend();">إرسال الرسائل الآن</button>
-            </form>
-        </div>
-    </div>
+    
 
     {% if nominations %}
     <form method="post">
@@ -148,6 +104,52 @@
     </div>
     {% endif %}
 </div>
+
+<div class="card mb-4">
+        <div class="card-header bg-primary text-white">رسالة أولياء الأمور والطلاب لمرشحي اختبار الجمعية</div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <label class="form-label">قالب رسالة ولي الأمر / الطالب</label>
+                <textarea name="association_sms_template" class="form-control" rows="10">{{ association_sms_template }}</textarea>
+                <small class="text-muted">المتغيرات المتاحة: &#123;&#123;&#123;الاسم_الأول&#125;&#125;&#125; و &#123;&#123;&#123;رقم_الجزء&#125;&#125;&#125; (وتدعم أيضاً: &#123;&#123;&#123;first_name&#125;&#125;&#125; و &#123;&#123;&#123;part_number&#125;&#125;&#125;)</small>
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button type="submit" name="form_action" value="save_association_sms_template" class="btn btn-outline-primary">حفظ قالب ولي الأمر</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">رسالة معلمي مرشحي اختبار الجمعية</div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <label class="form-label">قالب رسالة المعلم</label>
+                <textarea name="association_teacher_sms_template" class="form-control" rows="6">{{ association_teacher_sms_template }}</textarea>
+                <small class="text-muted">عند وجود عدة طلاب لنفس المعلم سيتم دمج الرسائل في رسالة واحدة. المتغيرات المتاحة: &#123;&#123;&#123;الاسم_الأول&#125;&#125;&#125; و &#123;&#123;&#123;رقم_الجزء&#125;&#125;&#125; و &#123;&#123;&#123;اسم_المعلم&#125;&#125;&#125;</small>
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button type="submit" name="form_action" value="save_association_teacher_sms_template" class="btn btn-outline-info">حفظ قالب المعلم</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">إرسال رسائل واتساب الآن</div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">
+                سيتم إرسال الرسائل عبر واتساب (whatsapp-web.js) لكل طالب محدد في الجدول أدناه إلى:
+                جوال الطالب (إن وُجد) باستخدام قالب ولي الأمر، جوال ولي الأمر، جوال المعلم، بالإضافة إلى ملخص يُرسل لرقم الإدارة.
+                ولي الأمر أو المعلم الذي يملك أكثر من طالب سيستلم رسالة واحدة مدمجة.
+            </p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="selected_nomination_ids_csv" id="selectedNominationIdsCsv" value="">
+                <button type="submit" name="form_action" value="send_association_sms" class="btn btn-success btn-lg" onclick="return prepareAssociationSmsSend();">إرسال الرسائل الآن</button>
+            </form>
+        </div>
+    </div>
 
 <script>
 function prepareAssociationSmsSend() {
