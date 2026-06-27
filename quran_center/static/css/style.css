@@ -319,6 +319,39 @@ body.sidebar-open .mobile-overlay {
     letter-spacing: 0.5px;
 }
 
+.nav-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    object-fit: contain;
+    border: 1px solid rgba(255,255,255,0.25);
+}
+
+.nav-logo-mobile {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-left: 0.4rem;
+}
+
+/* واعد ٤ wordmark — wide horizontal logo, sized as a wordmark not a square */
+.nav-logo-waed {
+    height: 40px;
+    width: auto;
+    max-width: 170px;
+    object-fit: contain;
+}
+
+.nav-logo-mobile-waed {
+    height: 30px;
+    width: auto;
+    max-width: 120px;
+    object-fit: contain;
+    vertical-align: middle;
+}
+
 .navbar .btn {
     margin: 0.3rem 0.25rem;
     transition: var(--transition);
@@ -950,5 +983,873 @@ body.sidebar-open .mobile-overlay {
         height: 55px;
         bottom: 20px;
         left: 20px;
+    }
+}
+
+/* ===================================
+   Attendance Page (Step 4)
+   =================================== */
+
+.attendance-date-card {
+    border-left: 4px solid var(--primary-blue);
+}
+
+.attendance-weekday-badge {
+    background: var(--light-blue);
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    color: var(--text-dark);
+    text-align: center;
+}
+
+/* Stage tabs — manager only */
+.stage-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 3px solid var(--primary-blue);
+    padding-bottom: 0;
+    list-style: none;
+}
+
+.stage-tab-btn {
+    background: #f8fafc;
+    border: 2px solid transparent;
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    padding: 0.6rem 1.4rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+}
+
+.stage-tab-btn.active {
+    background: var(--primary-blue);
+    color: #ffffff;
+    border-color: var(--dark-blue);
+}
+
+.stage-tab-btn:hover:not(.active) {
+    background: var(--light-blue);
+    color: var(--primary-blue);
+}
+
+.stage-panel-title {
+    color: var(--dark-blue);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    padding-right: 0.75rem;
+    border-right: 4px solid var(--primary-blue);
+}
+
+/* Attendance table */
+.attendance-table {
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+}
+
+.attendance-table thead th {
+    padding: 0.7rem 0.5rem;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.attendance-table .col-name {
+    text-align: right;
+    min-width: 140px;
+}
+
+.attendance-table .teacher-group-header th {
+    background: linear-gradient(135deg, var(--dark-blue) 0%, var(--primary-blue) 100%);
+    color: #ffffff;
+    text-align: right;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    border-radius: 0;
+}
+
+.attendance-table .student-name-cell {
+    text-align: right;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 0.5rem 0.8rem;
+}
+
+.attendance-table .period-cell {
+    text-align: center;
+    padding: 0.35rem;
+    width: 60px;
+}
+
+/* Status buttons — color is the PRIMARY signal, abbreviation is a label */
+.status-btn {
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    position: relative;
+}
+
+.status-btn:hover:not(:disabled) {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.status-btn:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.status-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Accessible color palette for the 5 statuses */
+.status-present        { background-color: #16a34a; }  /* green  — حاضر */
+.status-absent         { background-color: #dc2626; }  /* red    — غائب */
+.status-late           { background-color: #ea580c; }  /* orange — متأخر */
+.status-excused        { background-color: #ca8a04; }  /* yellow — منصرف (stored مستأذن) */
+.status-excused-absent { background-color: #6b7280; }  /* gray   — غياب بعذر */
+
+/* Finalized rows — visually locked for stage accounts */
+.finalized-row {
+    opacity: 0.55;
+    background-color: #f1f5f9;
+}
+
+.finalized-row .status-btn {
+    pointer-events: none;
+}
+
+/* Save indicator — small checkmark that fades in/out per click */
+.save-indicator {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    background: #16a34a;
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 5;
+    border: 2px solid #ffffff;
+}
+
+.save-indicator.show {
+    opacity: 1;
+}
+
+/* Action buttons row */
+.attendance-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin: 2rem 0 3rem;
+    flex-wrap: wrap;
+}
+
+.attendance-actions .btn {
+    min-width: 180px;
+    font-weight: 700;
+    padding: 0.8rem 2rem;
+}
+
+/* Toast for temp-save confirmation */
+.save-toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #16a34a;
+    color: #ffffff;
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1rem;
+    box-shadow: 0 8px 24px rgba(22, 163, 74, 0.4);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.save-toast.show {
+    opacity: 1;
+}
+
+/* Mobile: make status buttons a bit smaller, table scrolls if needed */
+@media (max-width: 768px) {
+    .status-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 0.75rem;
+    }
+
+    .attendance-table .col-name {
+        min-width: 100px;
+    }
+
+    .stage-tab-btn {
+        padding: 0.5rem 0.9rem;
+        font-size: 0.85rem;
+    }
+
+    .attendance-actions .btn {
+        min-width: 140px;
+        padding: 0.7rem 1.2rem;
+    }
+}
+
+/* ===================================
+   Parent Portal (Step 5)
+   =================================== */
+
+.parent-student-card .card-header {
+    transition: var(--transition);
+}
+
+.parent-student-card .card-header:hover {
+    opacity: 0.92;
+}
+
+.count-badge {
+    font-size: 1.5rem;
+    font-weight: bold;
+    border-radius: 10px;
+    padding: 0.3rem 0;
+    color: #ffffff;
+    margin-top: 0.25rem;
+}
+
+.count-absent         { background-color: #dc2626; }
+.count-late           { background-color: #ea580c; }
+.count-excused        { background-color: #ca8a04; }
+.count-excused-absent { background-color: #6b7280; }
+
+.status-pill {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.status-pill.status-present        { background-color: #16a34a; }
+.status-pill.status-absent         { background-color: #dc2626; }
+.status-pill.status-late           { background-color: #ea580c; }
+.status-pill.status-excused        { background-color: #ca8a04; }
+.status-pill.status-excused-absent { background-color: #6b7280; }
+
+/* ===================================
+   Admin Statistics Page
+   =================================== */
+
+.stats-stage-card {
+    border-left: 4px solid var(--primary-blue);
+}
+
+.stats-box {
+    border-radius: 12px;
+    padding: 1.2rem 0.5rem;
+    text-align: center;
+    transition: var(--transition);
+}
+
+.stats-box:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+.stats-num {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+    margin-bottom: 0.3rem;
+}
+
+.stats-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #ffffff;
+    opacity: 0.9;
+}
+
+.stats-total   { background: linear-gradient(135deg, var(--dark-blue), var(--primary-blue)); }
+.stats-present { background: linear-gradient(135deg, #16a34a, #22c55e); }
+.stats-absent  { background: linear-gradient(135deg, #dc2626, #ef4444); }
+.stats-pending { background: linear-gradient(135deg, #ea580c, #f97316); }
+.stats-done    { background: linear-gradient(135deg, #16a34a, #22c55e); }
+
+/* ===================================
+   واعد ٤ Landing Page (welcome.html)
+   Summer/sea/tropical poster aesthetic.
+   Separate palette from the staff-facing attendance pages.
+   =================================== */
+
+:root {
+    --waed-sky: #bfe8f7;
+    --waed-sea: #1e8bb8;
+    --waed-sea-mid: #4fb3d9;
+    --waed-navy: #1b3a5c;
+    --waed-orange: #f5a623;
+    --waed-orange-deep: #e8821a;
+    --waed-cream: #fff8ec;
+    --waed-green-accent: #2d9d6f;
+    --waed-green-light: #e8f8f0;
+    --waed-blue-light: #e8f4fd;
+    --waed-orange-light: #fef3e2;
+}
+
+/* ---- HERO ---- */
+.waed-hero {
+    background: linear-gradient(180deg, #bfe8f7 0%, #4fb3d9 45%, #1e8bb8 100%);
+    border-radius: 0 0 40px 40px;
+    padding: 3rem 1.5rem 4rem;
+    text-align: center;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    margin: -1.5rem -0.75rem 2.5rem;
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Decorative SVG elements */
+.waed-palm-left,
+.waed-palm-right {
+    position: absolute;
+    top: -20px;
+    width: 180px;
+    height: 260px;
+    z-index: 0;
+    pointer-events: none;
+}
+.waed-palm-left { left: -40px; }
+.waed-palm-right { right: -40px; transform: scaleX(-1); }
+
+.waed-mountain {
+    position: absolute;
+    bottom: 0;
+    right: -20px;
+    width: 280px;
+    height: 180px;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.waed-wave-left {
+    position: absolute;
+    top: 40px;
+    left: -10px;
+    width: 80px;
+    height: 350px;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Logo */
+.waed-hero-logo {
+    width: 300px;
+    max-width: 90%;
+    height: auto;
+    margin: 0 auto 1.5rem;
+    display: block;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 8px 20px rgba(0,0,0,0.2));
+}
+
+/* Tagline */
+.waed-tagline {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 0.3rem;
+    position: relative;
+    z-index: 1;
+    font-family: 'El Messiri', serif;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.25);
+    letter-spacing: 0.5px;
+}
+
+.waed-tagline-sub {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 1.8rem;
+    position: relative;
+    z-index: 1;
+    font-family: 'El Messiri', serif;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.waed-highlight-pill {
+    display: inline-block;
+    background: var(--waed-navy);
+    color: white;
+    padding: 0.15rem 0.8rem;
+    border-radius: 8px;
+    font-weight: 700;
+    margin: 0 0.2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* CTA Button */
+.waed-register-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #f5a623 0%, #e8821a 100%);
+    color: #ffffff;
+    font-size: 1.4rem;
+    font-weight: 700;
+    padding: 1rem 3.5rem;
+    border-radius: 50px;
+    text-decoration: none;
+    box-shadow: 0 10px 30px rgba(232, 130, 26, 0.45), inset 0 1px 0 rgba(255,255,255,0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    z-index: 1;
+    border: 3px solid rgba(255, 255, 255, 0.4);
+    font-family: 'El Messiri', serif;
+}
+
+.waed-register-btn:hover {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 16px 40px rgba(232, 130, 26, 0.55), inset 0 1px 0 rgba(255,255,255,0.4);
+    color: #ffffff;
+}
+
+.waed-register-btn i {
+    font-size: 1.2rem;
+}
+
+/* ---- SECTIONS ---- */
+.waed-section {
+    padding: 0 0 2.5rem;
+}
+
+/* Section header pill badge */
+.waed-section-header {
+    display: inline-block;
+    background: var(--waed-navy);
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 700;
+    padding: 0.5rem 1.8rem;
+    border-radius: 50px;
+    margin: 0 auto 1.5rem;
+    text-align: center;
+    font-family: 'El Messiri', serif;
+    box-shadow: 0 4px 12px rgba(27, 58, 92, 0.25);
+    /* Center the inline-block */
+    display: block;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ---- ACTIVITY CARDS ---- */
+.waed-activity-card {
+    background: white;
+    border-radius: 18px;
+    padding: 1.8rem 1rem 1.5rem;
+    text-align: center;
+    height: 100%;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+}
+
+.waed-activity-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 32px rgba(30, 139, 184, 0.18);
+}
+
+.waed-activity-card .activity-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.8rem;
+    font-size: 1.6rem;
+    color: white;
+    background: linear-gradient(135deg, var(--waed-sea) 0%, var(--waed-sea-mid) 100%);
+    box-shadow: 0 4px 12px rgba(30, 139, 184, 0.3);
+}
+
+.waed-activity-card .activity-label {
+    font-weight: 700;
+    color: var(--waed-navy);
+    font-size: 1.05rem;
+    font-family: 'El Messiri', serif;
+}
+
+/* ---- FEATURE ITEMS ---- */
+.waed-feature-item {
+    text-align: center;
+    padding: 1rem 0.5rem;
+}
+
+.waed-feature-item .feature-badge {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.6rem;
+    font-size: 1.3rem;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.feature-badge-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.feature-badge-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.feature-badge-green { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.feature-badge-purple { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+
+.waed-feature-item .feature-label {
+    font-weight: 700;
+    color: var(--waed-navy);
+    font-size: 0.95rem;
+}
+
+/* ---- INFO CARDS (dates + fees) ---- */
+.waed-info-card {
+    background: white;
+    border-radius: 18px;
+    padding: 1.8rem 1.5rem;
+    text-align: center;
+    height: 100%;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+    border-top: 5px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.waed-info-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+}
+
+.waed-info-orange { border-top-color: var(--waed-orange); }
+.waed-info-blue { border-top-color: var(--waed-sea); }
+.waed-info-green { border-top-color: var(--waed-green-accent); }
+
+.waed-info-card .info-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.8rem;
+    font-size: 1.4rem;
+    color: white;
+}
+
+.waed-info-orange .info-card-icon { background: linear-gradient(135deg, #f5a623, #e8821a); }
+.waed-info-blue .info-card-icon { background: linear-gradient(135deg, #1e8bb8, #4fb3d9); }
+.waed-info-green .info-card-icon { background: linear-gradient(135deg, #2d9d6f, #22c55e); }
+
+.waed-info-card .info-card-title {
+    font-weight: 700;
+    color: var(--waed-navy);
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    font-family: 'El Messiri', serif;
+}
+
+.waed-info-card .info-card-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.3rem;
+}
+
+.waed-info-card .info-card-value strong {
+    color: var(--waed-navy);
+}
+
+.waed-info-card .info-currency {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.waed-info-card .info-card-sub {
+    font-size: 0.88rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+}
+
+.waed-info-card .info-card-disclaimer {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    margin-top: 0.5rem;
+    border: 1px solid #e2e8f0;
+}
+
+/* ---- NOTICE CALLOUT ---- */
+.waed-notice {
+    background: var(--waed-cream);
+    border: 2px solid #fde68a;
+    border-right: 6px solid var(--waed-orange);
+    border-radius: 16px;
+    padding: 1.5rem 1.8rem;
+    margin: 0 0 2.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    box-shadow: 0 4px 16px rgba(245, 166, 35, 0.1);
+}
+
+.waed-notice .notice-icon {
+    font-size: 1.8rem;
+    color: var(--waed-orange);
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.waed-notice .notice-body {
+    flex: 1;
+}
+
+.waed-notice .notice-heading {
+    font-weight: 700;
+    color: var(--waed-navy);
+    font-size: 1.1rem;
+    margin-bottom: 0.3rem;
+    font-family: 'El Messiri', serif;
+}
+
+.waed-notice .notice-text {
+    color: #78350f;
+    font-weight: 500;
+    line-height: 1.7;
+    font-size: 0.95rem;
+}
+
+/* ---- FINAL CTA ---- */
+.waed-final-cta {
+    text-align: center;
+    margin: 0 0 2.5rem;
+    padding: 2rem 0;
+}
+
+.waed-staff-links {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 2px dashed #e2e8f0;
+}
+
+.waed-staff-links p {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.waed-staff-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #64748b;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.88rem;
+    padding: 0.4rem 1rem;
+    border-radius: 50px;
+    border: 1px solid #e2e8f0;
+    margin: 0.25rem;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.waed-staff-link:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: var(--waed-navy);
+    transform: translateY(-2px);
+}
+
+/* ---- MOBILE ---- */
+@media (max-width: 768px) {
+    .waed-hero {
+        padding: 2.5rem 1rem 3rem;
+        border-radius: 0 0 24px 24px;
+        min-height: 360px;
+        margin: -1.5rem -0.5rem 2rem;
+    }
+
+    .waed-hero-logo {
+        width: 220px;
+    }
+
+    .waed-tagline {
+        font-size: 1.4rem;
+    }
+
+    .waed-tagline-sub {
+        font-size: 1.1rem;
+    }
+
+    .waed-register-btn {
+        font-size: 1.15rem;
+        padding: 0.85rem 2.5rem;
+    }
+
+    .waed-section-header {
+        font-size: 1rem;
+        padding: 0.4rem 1.4rem;
+    }
+
+    .waed-activity-card .activity-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 1.3rem;
+    }
+
+    .waed-info-card .info-card-value {
+        font-size: 1.1rem;
+    }
+
+    .waed-notice {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .waed-palm-left,
+    .waed-palm-right {
+        width: 120px;
+        height: 180px;
+    }
+
+    .waed-mountain {
+        width: 180px;
+        height: 120px;
+    }
+}
+
+/* ===================================
+   Status Summary Pages (student_status, teacher_status)
+   =================================== */
+
+.stats-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+.stats-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary-blue);
+    margin: 0;
+}
+
+.stats-label {
+    font-size: 1rem;
+    color: #64748b;
+    margin: 0.5rem 0 0 0;
+}
+
+.status-summary-card {
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+    border: 3px solid transparent;
+}
+
+.status-summary-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+}
+
+.status-summary-card.status-present {
+    border-color: #16a34a;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.status-summary-card.status-absent {
+    border-color: #dc2626;
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+}
+
+.status-summary-card.status-late {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.status-summary-card.status-excused {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+}
+
+.status-summary-card.status-excused-absent {
+    border-color: #06b6d4;
+    background: linear-gradient(135deg, #ecfeff 0%, #cffafe 100%);
+}
+
+.status-count {
+    font-size: 3rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.status-summary-card.status-present .status-count { color: #16a34a; }
+.status-summary-card.status-absent .status-count { color: #dc2626; }
+.status-summary-card.status-late .status-count { color: #f59e0b; }
+.status-summary-card.status-excused .status-count { color: #8b5cf6; }
+.status-summary-card.status-excused-absent .status-count { color: #06b6d4; }
+
+.status-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0.5rem 0 0.25rem 0;
+}
+
+@media (max-width: 768px) {
+    .stats-number {
+        font-size: 2rem;
+    }
+
+    .status-count {
+        font-size: 2.5rem;
     }
 }

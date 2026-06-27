@@ -1,0 +1,9 @@
+{% load role_tags %}
+<button class="status-btn {{ status|status_css_class }}"
+        data-teacher-id="{{ item.teacher.id }}"
+        data-period="{{ period }}"
+        data-status="{{ status }}"
+        title="{{ status|status_display_name }}"
+        {% if finalized and not is_manager %}disabled{% endif %}>
+    {{ status|status_abbrev }}
+</button>

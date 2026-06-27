@@ -1,23 +1,23 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}حلقات جامع الحمودي - الاستعلام عن حالة الأبناء{% endblock %}
+{% block title %}استعلام أولياء الأمور{% endblock %}
 
 {% block content %}
 <div class="page-hero">
     <div class="page-hero-inner">
-        <h1 class="page-hero-title">الاستعلام عن حالة الأبناء</h1>
-        <p class="page-hero-subtitle">أدخل رقم جوال ولي الأمر لعرض النتائج</p>
+        <h1 class="page-hero-title">استعلام أولياء الأمور</h1>
+        <p class="page-hero-subtitle">أدخل رقم جوال ولي الأمر لعرض حالة الأبناء</p>
     </div>
 </div>
 
 <div class="row justify-content-center">
     <div class="col-lg-7">
-        <div class="card shadow-sm" style="border-top: 4px solid #0ea5e9;">
-            <div class="card-header" style="background: linear-gradient(90deg, #0ea5e9 0%, #0284c7 100%); color: white;">
-                <h5 style="margin: 0; font-family: 'El Messiri', serif; font-size: 1.4rem;">الاستعلام عن حالة الأبناء</h5>
+        <div class="card shadow-sm" style="border-top: 4px solid var(--primary-blue);">
+            <div class="card-header" style="background: linear-gradient(90deg, var(--primary-blue) 0%, var(--secondary-blue) 100%); color: white;">
+                <h5 style="margin: 0; font-family: 'El Messiri', serif; font-size: 1.4rem;">استعلام عن حالة الأبناء</h5>
             </div>
             <div class="card-body">
-                <p class="text-muted" style="margin-bottom: 1.5rem;">أدخل رقم جوال ولي الأمر لعرض حالة الأبناء المسجلين.</p>
+                <p class="text-muted" style="margin-bottom: 1.5rem;">أدخل رقم جوال ولي الأمر المسجل لعرض حالة الأبناء.</p>
 
                 {% if error_message %}
                 <div class="alert alert-warning" role="alert">
@@ -33,7 +33,7 @@
                     </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">بحث</button>
-                        <a href="{% url 'welcome' %}" class="btn btn-outline-secondary">العودة للصفحة الرئيسية</a>
+                        <a href="{% url 'welcome' %}" class="btn btn-outline-secondary">العودة للرئيسية</a>
                     </div>
                 </form>
             </div>

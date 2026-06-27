@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load static role_tags %}
+
+{% block title %}إضافة طالب{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">إضافة طالب جديد</h1>
+        <p class="page-hero-subtitle">
+            {% if is_manager %}
+                يمكن للمدير إضافة طلاب لأي مرحلة
+            {% else %}
+                إضافة طالب في مرحلتك: {{ user_stage }}
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<div class="row justify-content-center" dir="rtl">
+    <div class="col-lg-7">
+        <div class="card" style="border-top: 4px solid var(--primary-blue);">
+            <div class="card-header" style="background: linear-gradient(90deg, var(--primary-blue) 0%, var(--secondary-blue) 100%); color: white;">
+                <h5 style="margin: 0; font-family: 'El Messiri', serif; font-size: 1.3rem;">بيانات الطالب</h5>
+            </div>
+            <div class="card-body">
+
+                {% if success %}
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <strong>تم!</strong> تمت إضافة الطالب "{{ success_name }}" بنجاح.
+                    <hr>
+                    <a href="{% url 'add_student' %}" class="btn btn-sm btn-success">إضافة طالب آخر</a>
+                    <a href="{% url 'attendance_page' %}" class="btn btn-sm btn-outline-secondary">العودة للتحضير</a>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endif %}
+
+                {% if errors %}
+                <div class="alert alert-danger" role="alert">
+                    <strong>يرجى تصحيح الأخطاء التالية:</strong>
+                    <ul style="margin-bottom: 0; margin-top: 0.5rem;">
+                        {% for error in errors %}
+                        <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="national_id" class="form-label">رقم الهوية <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="national_id" name="national_id"
+                               value="{{ form_data.national_id|default:'' }}"
+                               maxlength="10" pattern="\d{10}" placeholder="10 أرقام"
+                               inputmode="numeric" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="full_name" class="form-label">الاسم الثلاثي <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="full_name" name="full_name"
+                               value="{{ form_data.full_name|default:'' }}"
+                               placeholder="الاسم الأول اسم الأب العائلة" required>
+                    </div>
+
+                    {% if is_manager %}
+                    <div class="mb-3">
+                        <label for="stage" class="form-label">المرحلة <span class="text-danger">*</span></label>
+                        <select class="form-select" id="stage" name="stage" required onchange="loadTeachersForStage()">
+                            <option value="">-- اختر المرحلة --</option>
+                            {% for code, name in stage_choices %}
+                            <option value="{{ code }}"
+                                {% if form_data.stage == code or initial_stage == code %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="teacher" class="form-label">المعلم المسؤول</label>
+                        <select class="form-select" id="teacher" name="teacher">
+                            <option value="">-- اختر المعلم --</option>
+                            {% for t in teachers_in_stage %}
+                            <option value="{{ t.id }}"
+                                {% if form_data.teacher == t.id|stringformat:"s" %}selected{% endif %}>
+                                {{ t.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted" id="teacherHint">
+                            {% if teachers_in_stage %}
+                                المعلمون المتوفرون في هذه المرحلة
+                            {% else %}
+                                اختر المرحلة أولاً لعرض المعلمين المتاحين
+                            {% endif %}
+                        </small>
+                    </div>
+                    {% else %}
+                    {# Stage account: stage is fixed, teacher dropdown shows their stage's teachers #}
+                    <input type="hidden" name="stage" value="{{ user_stage }}">
+
+                    <div class="mb-3">
+                        <label class="form-label">المرحلة</label>
+                        <div class="form-control bg-light" readonly>{{ user_stage }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="teacher" class="form-label">المعلم المسؤول</label>
+                        <select class="form-select" id="teacher" name="teacher">
+                            <option value="">-- اختر المعلم --</option>
+                            {% for t in teachers_in_stage %}
+                            <option value="{{ t.id }}"
+                                {% if form_data.teacher == t.id|stringformat:"s" %}selected{% endif %}>
+                                {{ t.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="student_phone" class="form-label">جوال الطالب</label>
+                        <input type="text" class="form-control" id="student_phone" name="student_phone"
+                               value="{{ form_data.student_phone|default:'' }}"
+                               placeholder="05xxxxxxxx" inputmode="tel">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="parent_phone" class="form-label">جوال ولي الأمر</label>
+                        <input type="text" class="form-control" id="parent_phone" name="parent_phone"
+                               value="{{ form_data.parent_phone|default:'' }}"
+                               placeholder="05xxxxxxxx" inputmode="tel">
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">حفظ الطالب</button>
+                        <a href="{% url 'attendance_page' %}" class="btn btn-outline-secondary">إلغاء</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if is_manager %}
+<script>
+// Dynamically load teachers when the manager changes the stage selector.
+// Uses a fetch to a simple endpoint that returns teachers for a stage.
+function loadTeachersForStage() {
+    const stageSelect = document.getElementById('stage');
+    const teacherSelect = document.getElementById('teacher');
+    const hint = document.getElementById('teacherHint');
+    const stage = stageSelect.value;
+
+    teacherSelect.innerHTML = '<option value="">-- اختر المعلم --</option>';
+
+    if (!stage) {
+        if (hint) hint.textContent = 'اختر المرحلة أولاً لعرض المعلمين المتاحين';
+        return;
+    }
+
+    fetch(`/teachers-api/?stage=${encodeURIComponent(stage)}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.teachers) {
+            data.teachers.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = t.name;
+                teacherSelect.appendChild(opt);
+            });
+            if (hint) {
+                hint.textContent = data.teachers.length > 0
+                    ? `${data.teachers.length} معلمون متوفرون`
+                    : 'لا يوجد معلمون في هذه المرحلة بعد';
+            }
+        }
+    })
+    .catch(() => {
+        if (hint) hint.textContent = 'تعذر تحميل المعلمين';
+    });
+}
+</script>
+{% endif %}
+{% endblock %}

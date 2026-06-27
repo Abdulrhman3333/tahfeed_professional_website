@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load static role_tags %}
+
+{% block title %}إضافة معلم{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">إضافة معلم جديد</h1>
+        <p class="page-hero-subtitle">أضف معلماً وحدد المرحلة التي يُدرّس فيها</p>
+    </div>
+</div>
+
+<div class="row justify-content-center" dir="rtl">
+    <div class="col-lg-6">
+        <div class="card" style="border-top: 4px solid var(--primary-blue);">
+            <div class="card-header" style="background: linear-gradient(90deg, var(--primary-blue) 0%, var(--secondary-blue) 100%); color: white;">
+                <h5 style="margin: 0; font-family: 'El Messiri', serif; font-size: 1.3rem;">بيانات المعلم</h5>
+            </div>
+            <div class="card-body">
+
+                {% if success %}
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <strong>تم!</strong> تمت إضافة المعلم "{{ success_name }}" بنجاح.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endif %}
+
+                {% if errors %}
+                <div class="alert alert-danger" role="alert">
+                    <strong>يرجى تصحيح الأخطاء التالية:</strong>
+                    <ul style="margin-bottom: 0; margin-top: 0.5rem;">
+                        {% for error in errors %}
+                        <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="name" class="form-label">اسم المعلم <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name"
+                               value="{{ form_data.name|default:'' }}"
+                               placeholder="مثال: أ. أحمد العتيبي" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="stage" class="form-label">المرحلة <span class="text-danger">*</span></label>
+                        <select class="form-select" id="stage" name="stage" required>
+                            <option value="">-- اختر المرحلة --</option>
+                            {% for code, name in stage_choices %}
+                            <option value="{{ code }}"
+                                {% if form_data.stage == code %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">رقم الجوال</label>
+                        <input type="text" class="form-control" id="phone" name="phone"
+                               value="{{ form_data.phone|default:'' }}"
+                               placeholder="05xxxxxxxx" inputmode="tel">
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">حفظ المعلم</button>
+                        <a href="{% url 'admin_statistics' %}" class="btn btn-outline-secondary">العودة للإحصائيات</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# List of existing teachers #}
+{% if teachers %}
+<div class="row mt-4" dir="rtl">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header" style="background: linear-gradient(90deg, var(--dark-blue) 0%, var(--primary-blue) 100%); color: white;">
+                <h5 style="margin: 0; font-family: 'El Messiri', serif;">المعلمون المسجلون ({{ teachers|length }})</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover" style="font-size: 0.9rem;">
+                        <thead style="background-color: #f3f4f6;">
+                            <tr>
+                                <th class="text-end">المعلم</th>
+                                <th>المرحلة</th>
+                                <th>الجوال</th>
+                                <th>عدد الطلاب</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in teachers %}
+                            <tr>
+                                <td class="text-end fw-bold">{{ t.name }}</td>
+                                <td>{{ t.stage }}</td>
+                                <td>{{ t.phone|default:'—' }}</td>
+                                <td>{{ t.student_set.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
