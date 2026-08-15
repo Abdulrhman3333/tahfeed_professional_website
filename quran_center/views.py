@@ -398,6 +398,50 @@ def parse_memorization_bundle_from_workbook(workbook):
     }
 
 
+def merge_sibling_rows(rows):
+    """Group attendance rows by parent phone so siblings get one combined message.
+
+    Within a group: first names are joined with ' و', total_days are summed,
+    and teacher info is taken from the first sibling. Rows without a parent
+    phone are passed through individually so they still appear in the failure
+    list of send_batch_messages.
+    """
+    grouped = {}
+    no_phone_rows = []
+    order = []
+
+    for row in rows:
+        phone = (row.get('phone_number') or '').strip()
+        if not phone:
+            no_phone_rows.append(row)
+            continue
+        if phone not in grouped:
+            grouped[phone] = []
+            order.append(phone)
+        grouped[phone].append(row)
+
+    merged = []
+    for phone in order:
+        siblings = grouped[phone]
+        if len(siblings) == 1:
+            merged.append(siblings[0])
+            continue
+
+        first_names = [s.get('first_name') or '' for s in siblings if s.get('first_name')]
+        full_names = [s.get('full_name') or '' for s in siblings if s.get('full_name')]
+
+        combined = dict(siblings[0])
+        if first_names:
+            combined['first_name'] = ' و'.join(first_names)
+        if full_names:
+            combined['full_name'] = ' و'.join(full_names)
+        combined['total_days'] = sum(int(s.get('total_days') or 0) for s in siblings)
+        merged.append(combined)
+
+    merged.extend(no_phone_rows)
+    return merged
+
+
 def build_status_export_rows(target_date, status_code):
     attendances = Attendance.objects.filter(date=target_date, status=status_code).select_related('student')
     rows = []
@@ -2044,7 +2088,8 @@ def preparer_absent_contacts(request):
     if request.method == 'POST':
         sms_action = request.POST.get('sms_action')
         if sms_action in status_rows and request.POST.get('save_templates') != '1':
-            batch_result = send_batch_messages(status_rows[sms_action], current_templates[sms_action])
+            merged_rows = merge_sibling_rows(status_rows[sms_action])
+            batch_result = send_batch_messages(merged_rows, current_templates[sms_action])
             sms_feedback = {
                 'section': sms_action,
                 'success_count': batch_result['success_count'],

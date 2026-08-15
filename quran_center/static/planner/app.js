@@ -1670,7 +1670,7 @@
                 btn.disabled = true;
 
                 const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
 
                 const pdfContainer = document.getElementById('pdfContainer');
                 pdfContainer.style.position = 'absolute';
@@ -1701,10 +1701,10 @@
                         pdfPage.style.display = 'block';
                         pdfPage.style.pageBreakAfter = 'auto';
 
-                        // Capture at higher effective resolution for sharper PDF text and borders.
+                        // Capture at a moderate effective resolution: enough for sharp text, small enough for a compact PDF.
                         const devicePixelRatio = window.devicePixelRatio || 1;
-                        const baseScale = 4;
-                        const normalizedScale = Math.max(baseScale / devicePixelRatio, 3);
+                        const baseScale = 2;
+                        const normalizedScale = Math.max(baseScale / devicePixelRatio, 2);
 
                         const canvas = await html2canvas(pdfPage, {
                             scale: normalizedScale,
@@ -1718,7 +1718,7 @@
                             windowHeight: Math.round(1123 * normalizedScale)
                         });
 
-                        const imgData = canvas.toDataURL('image/png');
+                        const imgData = canvas.toDataURL('image/jpeg', 0.92);
 
                         // Add new page if not first student
                         if (i > 0) {
@@ -1741,9 +1741,9 @@
                             const scaledHeight = maxHeight;
                             const scaledWidth = (canvas.width * scaledHeight) / canvas.height;
                             const centeredX = (pdfWidth - scaledWidth) / 2;
-                            pdf.addImage(imgData, 'PNG', centeredX, yOffset, scaledWidth, scaledHeight);
+                            pdf.addImage(imgData, 'JPEG', centeredX, yOffset, scaledWidth, scaledHeight, undefined, 'FAST');
                         } else {
-                            pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight);
+                            pdf.addImage(imgData, 'JPEG', xOffset, yOffset, imgWidth, imgHeight, undefined, 'FAST');
                         }
                     }
                 }
