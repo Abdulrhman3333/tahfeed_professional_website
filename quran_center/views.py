@@ -1,26 +1,68 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
-from django.http import HttpResponse, JsonResponse
-from django.conf import settings
-from .forms import StudentRegistrationForm, StudentBulkUploadForm, MemorizationTemplateUploadForm
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
-from .models import Student, Attendance, TeacherAttendance, StageSupervisor, AcademicCalendar, ExamNomination, UserRole, TeacherPlanPreference, SmsTemplateSetting, MemorizationTemplateBundle, TeacherProfile
-from django.utils import timezone
 from django.contrib.auth.models import User
-from django.db.models import Count, Q, Max
-from datetime import datetime, date, timedelta
-from openpyxl import Workbook, load_workbook
-from uuid import uuid4
-import json
-import re
-from urllib import request as urlrequest
-from urllib.error import HTTPError, URLError
+from django.utils import timezone
+from django.db.models import Q
+from datetime import datetime, timedelta
+from collections import OrderedDict
 from urllib.parse import quote, unquote
 
+from .models import (
+    Student, Attendance, AttendanceChangeLog, StageProfile, Teacher,
+    TeacherAttendance, STAGE_CHOICES, PERIOD_STATUS_CHOICES,
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def get_user_stage(user):
+    """Return the stage code this user manages, or None for the manager.
+
+    The manager (is_superuser=True) sees all 5 stages. A stage account has
+    a StageProfile whose managed_stage restricts their access.
+    """
+    if not user.is_authenticated:
+        return None
+    if user.is_superuser:
+        return None
+    profile = getattr(user, 'stage_profile', None)
+    return profile.managed_stage if profile else None
+
+
+def get_arabic_weekday_name(target_date):
+    names = {
+        0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء',
+        3: 'الخميس', 4: 'الجمعة', 5: 'السبت', 6: 'الأحد',
+    }
+    return names.get(target_date.weekday(), 'الأحد')
+
+
+def notify_parents_of_negative_attendance(attendance_ids):
+    """TODO: Integration point for parent notifications.
+
+    This function would notify parents of students who have negative
+    attendance (غائب, متأخر, مستأذن, غياب بعذر) on a finalized day.
+
+    In the original project, this was handled by a WhatsApp bot
+    (whatsapp_bot/ folder, deleted in Step 1) and an SMS API. This stub
+    marks where a freestanding notification service would eventually plug
+    back in — NOT by resurrecting the deleted bot code wholesale, but as a
+    clean integration point that could call any notification backend (SMS,
+    push, email, etc.).
+    """
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
 
 class TeacherLoginView(LoginView):
-    """تسجيل دخول المعلمين مع خيار تذكر اسم المستخدم والاستمرار في تسجيل الدخول."""
+    """Login view with remember-me cookie support for Arabic usernames."""
     template_name = 'login.html'
 
     def get_initial(self):
@@ -50,20 +92,14 @@ class TeacherLoginView(LoginView):
         response = super().form_valid(form)
         remember_me = self.request.POST.get('remember_me') == 'on'
         username = form.cleaned_data.get('username', '')
-
         if remember_me:
-            # Cookie values must be ASCII-safe; encode to avoid crashes with Arabic usernames.
             safe_username = quote(username, safe='')
             response.set_cookie(
-                'remembered_username',
-                safe_username,
-                max_age=60 * 60 * 24 * 30,
-                httponly=False,
-                samesite='Lax'
+                'remembered_username', safe_username,
+                max_age=60 * 60 * 24 * 30, httponly=False, samesite='Lax',
             )
         else:
             response.delete_cookie('remembered_username')
-
         return response
 
 # دالة مساعدة للتحقق من صلاحية مشرف المرحلة
@@ -730,1269 +766,722 @@ def pending_students(request):
     ).distinct().order_by('username')
     
     if request.method == 'POST':
-        student_id = request.POST.get('student_id')
-        teacher_id = request.POST.get('teacher_id')
-        student = get_object_or_404(Student, id=student_id)
-        
-        # تعيين المعلم إذا تم اختياره
-        if teacher_id:
-            teacher = get_object_or_404(User, id=teacher_id)
-            student.teacher = teacher
-        
-        student.status = 'منتظم'
-        student.save()
-        return redirect('pending_students')
-
-    return render(request, 'pending.html', {'students': students, 'teachers': teachers})
-
-@login_required
-def stage_students_data(request):
-    """صفحة عرض بيانات طلاب المرحلة - للمشرفين فقط"""
-    # التحقق من الصلاحيات
-    if not is_stage_supervisor(request.user):
-        return redirect('home')
-    
-    # جلب الطلاب حسب مرحلة المشرف
-    if request.user.is_superuser:
-        # المدير يرى جميع الطلاب المنتظمين
-        students = Student.objects.filter(status='منتظم')
-    elif hasattr(request.user, 'stage_supervisor'):
-        # مشرف المرحلة يرى فقط طلاب مرحلته المنتظمين
-        supervisor = request.user.stage_supervisor
-        students = Student.objects.filter(status='منتظم', educational_stage=supervisor.stage)
-    elif user_has_role(request.user, 'supervisor'):
-        # المشرف العام يرى جميع الطلاب المنتظمين
-        students = Student.objects.filter(status='منتظم')
-    else:
-        students = Student.objects.none()
-    
-    today = timezone.now().date()
-    # النطاق الافتراضي: من الأحد إلى الخميس من الأسبوع الحالي.
-    sunday_offset = (today.weekday() + 1) % 7
-    default_start_date = today - timedelta(days=sunday_offset)
-    default_end_date = default_start_date + timedelta(days=4)
-
-    # فلترة التاريخ لاحتساب الغياب ضمن نطاق محدد
-    start_date_str = (request.GET.get('start_date') or '').strip()
-    end_date_str = (request.GET.get('end_date') or '').strip()
-
-    try:
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else default_start_date
-    except ValueError:
-        start_date = default_start_date
-
-    try:
-        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date() if end_date_str else default_end_date
-    except ValueError:
-        end_date = default_end_date
-
-    if start_date and end_date and start_date > end_date:
-        start_date, end_date = end_date, start_date
-
-    # نحتاج قائمة فعلية لإضافة العد ثم الترتيب حسب الأعلى غياباً
-    students = list(students.select_related('teacher').order_by('teacher__username', 'full_name'))
-
-    for student in students:
-        attendance_qs = Attendance.objects.filter(student=student, status='غائب')
-        if start_date:
-            attendance_qs = attendance_qs.filter(date__gte=start_date)
-        if end_date:
-            attendance_qs = attendance_qs.filter(date__lte=end_date)
-        student.absent_count_in_range = attendance_qs.count()
-
-    students.sort(key=lambda s: (-getattr(s, 'absent_count_in_range', 0), s.full_name or ''))
-    
-    # جلب جميع المعلمين لقائمة التعيين
-    teachers = User.objects.filter(
-        Q(student__isnull=False) | Q(is_staff=True)
-    ).distinct().order_by('username')
-    
-    # معالجة طلب تحديث المعلم
-    if request.method == 'POST':
-        student_id = request.POST.get('student_id')
-        teacher_id = request.POST.get('teacher_id')
-        
-        try:
-            student = get_object_or_404(Student, id=student_id)
-            
-            # تعيين المعلم الجديد إذا تم اختياره
-            if teacher_id:
-                teacher = get_object_or_404(User, id=teacher_id)
-                student.teacher = teacher
-                student.save()
-        except:
-            pass
-
-        query = []
-        if start_date:
-            query.append(f"start_date={start_date.strftime('%Y-%m-%d')}")
-        if end_date:
-            query.append(f"end_date={end_date.strftime('%Y-%m-%d')}")
-
-        if query:
-            return redirect(f"{reverse('stage_students_data')}?{'&'.join(query)}")
-        return redirect('stage_students_data')
-    
-    # الحصول على المرحلة الحالية
-    current_stage = None
-    if hasattr(request.user, 'stage_supervisor'):
-        current_stage = request.user.stage_supervisor.stage
-    
-    return render(request, 'stage_students_data.html', {
-        'students': students,
-        'teachers': teachers,
-        'current_stage': current_stage,
-        'start_date': start_date,
-        'end_date': end_date,
-        'today': today,
-        'default_start_date': default_start_date,
-        'default_end_date': default_end_date,
-    })
-
-@login_required
-def take_attendance(request):
-    """التحضير اليومي للمعلم"""
-    # جلب طلاب هذا المعلم فقط والذين حالتهم "منتظم"
-    students = Student.objects.filter(teacher=request.user, status='منتظم').order_by('full_name')
-    
-    # الحصول على التاريخ الحالي
-    today = timezone.now().date()
-
-    selected_date_str = request.POST.get('attendance_date') or request.GET.get('date') or str(today)
-    try:
-        selected_date = datetime.strptime(selected_date_str, "%Y-%m-%d").date()
-    except ValueError:
-        selected_date = today
-    
-    # تحديد اليوم بالعربي
-    current_weekday = get_arabic_weekday_name(selected_date)
-    
-    # الحصول على رقم الأسبوع من التقويم
-    current_week = AcademicCalendar.get_week_from_date(selected_date)
-    
-    success = False
-    if request.method == 'POST':
-        posted_date_str = request.POST.get('attendance_date', str(selected_date))
-        try:
-            posted_date = datetime.strptime(posted_date_str, "%Y-%m-%d").date()
-        except ValueError:
-            posted_date = selected_date
-
-        selected_weekday = get_arabic_weekday_name(posted_date)
-        selected_week = AcademicCalendar.get_week_from_date(posted_date)
-        
-        for student in students:
-            status = request.POST.get(f'status_{student.id}')
-            if status:
-                Attendance.objects.update_or_create(
-                    student=student,
-                    date=posted_date,
-                    defaults={
-                        'status': status,
-                        'weekday': selected_weekday,
-                        'week_number': selected_week
-                    }
-                )
-        # بدل redirect، نعيد تحميل البيانات وإظهار رسالة نجاح
-        success = True
-        selected_date = posted_date
-        current_weekday = selected_weekday
-        current_week = selected_week
-
-    existing_attendance = Attendance.objects.filter(student__in=students, date=selected_date)
-    attendance_map = {item.student_id: item.status for item in existing_attendance}
-    
-    # إضافة حالة لكل طالب (حاضر افتراضياً إذا لم يكن له سجل)
-    students_with_status = []
-    for student in students:
-        status = attendance_map.get(student.id, 'حاضر')
-        students_with_status.append({
-            'student': student,
-            'status': status
-        })
-    
-    context = {
-        'students_with_status': students_with_status,
-        'current_weekday': current_weekday,
-        'current_week': current_week,
-        'selected_date': selected_date,
-        'today': today,
-        'attendance_map': attendance_map,
-        'success': success,
-    }
-    
-    return render(request, 'attendance.html', context)
-
-def success_view(request):
-    return render(request, 'success.html')
-
-def attendance_success_view(request):
-    return render(request, 'attendance_success.html')
-
-def welcome_view(request):
-    return render(request, 'welcome.html')
-
-def parent_inquiry(request):
-    error_message = None
-    if request.method == 'POST':
         parent_phone = request.POST.get('parent_phone', '').strip()
         if not parent_phone:
             error_message = "يرجى إدخال رقم الجوال"
         else:
-            students = Student.objects.filter(parent_phone=parent_phone).select_related('teacher').order_by('full_name')
+            students = Student.objects.filter(parent_phone=parent_phone).order_by('full_name')
+            results = []
 
             for student in students:
-                attendances = Attendance.objects.filter(student=student).order_by('-date')
-                student.present_count = attendances.filter(status='حاضر').count()
-                student.absent_count = attendances.filter(status='غائب').count()
-                student.absent_excused_count = attendances.filter(status='غياب بعذر').count()
-                student.excused_count = attendances.filter(status='مستأذن').count()
-                student.late_count = attendances.filter(status='متأخر').count()
-                student.recent_attendance = attendances[:10]
+                attendances = Attendance.objects.filter(student=student)
 
-                teacher_phone = None
-                if student.teacher and hasattr(student.teacher, 'teacher_profile'):
-                    teacher_phone = student.teacher.teacher_profile.phone
-                student.teacher_phone = teacher_phone
+                # Counts across ALL 4 period columns and all dates.
+                # We deliberately do NOT count or display حاضر.
+                absent_count = 0
+                late_count = 0
+                excused_count = 0       # مستأذن (displayed as منصرف)
+                absent_excused_count = 0  # غياب بعذر
 
-            return render(
-                request,
-                'parent_inquiry_results.html',
-                {
-                    'students': students,
-                    'parent_phone': parent_phone,
-                }
-            )
+                # Timeline of every non-حاضر period entry.
+                timeline = []
+                for att in attendances:
+                    for period_num, field in enumerate(
+                        ['period_1', 'period_2', 'period_3', 'period_4'], start=1
+                    ):
+                        val = getattr(att, field)
+                        if val == 'غائب':
+                            absent_count += 1
+                        elif val == 'متأخر':
+                            late_count += 1
+                        elif val == 'مستأذن':
+                            excused_count += 1
+                        elif val == 'غياب بعذر':
+                            absent_excused_count += 1
+
+                        if val != 'حاضر':
+                            timeline.append({
+                                # Using att.id (NOT national_id) for any
+                                # frontend reference — see security note above.
+                                'attendance_id': att.id,
+                                'date': att.date,
+                                'period': period_num,
+                                'status': val,
+                            })
+
+                timeline.sort(key=lambda x: x['date'], reverse=True)
+
+                results.append({
+                    # NOTE: national_id is intentionally omitted here.
+                    'full_name': student.full_name,
+                    'stage': student.stage,
+                    'absent_count': absent_count,
+                    'late_count': late_count,
+                    'excused_count': excused_count,
+                    'absent_excused_count': absent_excused_count,
+                    'timeline': timeline,
+                })
+
+            return render(request, 'parent_inquiry_results.html', {
+                'students': results,
+                'parent_phone': parent_phone,
+            })
 
     return render(request, 'parent_inquiry.html', {'error_message': error_message})
 
-# دالة للتحقق من أن المستخدم ليس معلماً أو مشرفاً (للصفحة العامة فقط)
-def home(request):
-    """الصفحة الرئيسية - نموذج التسجيل العام"""
-    # السماح للمشرفين والمدير بالوصول لصفحة التسجيل
-    if request.user.is_authenticated:
-        # المدير والمشرفون يمكنهم الوصول
-        if not (is_stage_supervisor(request.user) or request.user.is_superuser):
-            # المعلمون العاديون يتم توجيههم
-            if Student.objects.filter(teacher=request.user).exists():
-                return redirect('teacher_dashboard')
-            elif request.user.is_staff:
-                return redirect('admin:index')
-    
-    if request.method == 'POST':
-        form = StudentRegistrationForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('success')
+
+# ---------------------------------------------------------------------------
+# Attendance page (core deliverable — Step 4)
+# ---------------------------------------------------------------------------
+
+@login_required
+def attendance_page(request):
+    """Single page serving both manager and stage accounts.
+
+    Manager: sees all 5 stages via a tabbed layout (all tables pre-rendered
+    in the DOM, only one visible at a time).
+    Stage account: sees only their stage's table (no tabs).
+    """
+    selected_date_str = request.GET.get('date') or str(timezone.now().date())
+    try:
+        selected_date = datetime.strptime(selected_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        selected_date = timezone.now().date()
+
+    is_manager = request.user.is_superuser
+    user_stage = get_user_stage(request.user)
+
+    if is_manager:
+        stages = STAGE_CHOICES
+    elif user_stage:
+        stages = [(user_stage, user_stage)]
     else:
-        form = StudentRegistrationForm()
-    
-    return render(request, 'home.html', {'form': form})
+        stages = []
+
+    stages_data = []
+    for stage_code, stage_name in stages:
+        students = Student.objects.filter(
+            stage=stage_code
+        ).select_related('teacher').order_by('teacher__name', 'full_name')
+
+        attendance_records = Attendance.objects.filter(
+            student__stage=stage_code, date=selected_date
+        )
+        attendance_map = {att.student_id: att for att in attendance_records}
+
+        # Group by teacher (generic — works with any number of teachers).
+        groups = OrderedDict()
+        for student in students:
+            teacher_key = student.teacher_id
+            if teacher_key not in groups:
+                teacher_name = student.teacher.name if student.teacher else "غير محدد"
+                groups[teacher_key] = {'teacher_name': teacher_name, 'students': []}
+
+            att = attendance_map.get(student.national_id)
+            groups[teacher_key]['students'].append({
+                'student': student,
+                'attendance_id': att.id if att else None,
+                'is_finalized': att.is_finalized if att else False,
+                'period_1': att.period_1 if att else 'حاضر',
+                'period_2': att.period_2 if att else 'حاضر',
+                'period_3': att.period_3 if att else 'حاضر',
+                'period_4': att.period_4 if att else 'حاضر',
+            })
+
+        stages_data.append({
+            'stage_code': stage_code,
+            'stage_name': stage_name,
+            'groups': list(groups.values()),
+        })
+
+    context = {
+        'stages_data': stages_data,
+        'selected_date': selected_date,
+        'today': timezone.now().date(),
+        'is_manager': is_manager,
+        'user_stage': user_stage,
+        'weekday_name': get_arabic_weekday_name(selected_date),
+    }
+    return render(request, 'attendance.html', context)
 
 
 @login_required
-def bulk_students_upload(request):
-    if not (request.user.is_superuser or user_has_role(request.user, 'manager')):
-        return redirect('home')
+def save_period(request):
+    """AJAX endpoint: save a single period's status for one student/date."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST only'})
 
-    form = StudentBulkUploadForm(request.POST or None, request.FILES or None)
-    result = None
+    # national_id is used here on this authenticated staff endpoint; it is
+    # never exposed to the parent portal (see parent_inquiry security note).
+    student_national_id = request.POST.get('student_id')
+    date_str = request.POST.get('date')
+    period_num = request.POST.get('period')
+    status = request.POST.get('status')
 
-    if request.method == 'POST' and form.is_valid():
-        uploaded_file = form.cleaned_data['excel_file']
-        last_part_choices = {choice[0] for choice in Student._meta.get_field('last_tested_part').choices}
-        status_default = Student._meta.get_field('status').default
+    try:
+        att_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'invalid date'})
 
-        created_count = 0
-        skipped_count = 0
-        row_errors = []
+    if period_num not in ('1', '2', '3', '4'):
+        return JsonResponse({'ok': False, 'error': 'invalid period'})
 
-        try:
-            rows = read_excel_sheet_as_dicts(uploaded_file)
-        except Exception:
-            form.add_error('excel_file', 'تعذر قراءة الملف. تأكد أن الملف بصيغة Excel صحيحة (.xlsx).')
-            rows = []
+    valid_statuses = [c[0] for c in PERIOD_STATUS_CHOICES]
+    if status not in valid_statuses:
+        return JsonResponse({'ok': False, 'error': 'invalid status'})
 
-        for row in rows:
-            row_number = row['excel_row']
-            data = row['data']
+    student = get_object_or_404(Student, national_id=student_national_id)
 
-            full_name = normalize_excel_value(data.get('full_name'))
-            identity_number = normalize_excel_value(data.get('identity_number'))
+    # Permission: stage account can only edit their own stage's students.
+    user_stage = get_user_stage(request.user)
+    if user_stage and student.stage != user_stage:
+        return JsonResponse({'ok': False, 'error': 'permission denied'})
 
-            if not full_name and not identity_number:
-                skipped_count += 1
-                continue
+    att, created = Attendance.objects.get_or_create(
+        student=student, date=att_date,
+    )
 
-            if not identity_number:
-                identity_number = f'GEN_{uuid4().hex[:12]}'
+    # Finalized rows are locked for stage accounts; manager can override.
+    if att.is_finalized and not request.user.is_superuser:
+        return JsonResponse({'ok': False, 'error': 'finalized'})
 
-            if Student.objects.filter(identity_number=identity_number).exists():
-                skipped_count += 1
-                row_errors.append(f'السطر {row_number}: رقم الهوية {identity_number} موجود مسبقاً.')
-                continue
-
-            grade_input = data.get('grade')
-            grade = map_grade_from_excel(grade_input)
-            if normalize_excel_value(grade_input) and not grade:
-                skipped_count += 1
-                row_errors.append(f'السطر {row_number}: الصف الدراسي "{normalize_excel_value(grade_input)}" غير صحيح.')
-                continue
-
-            last_tested_part = normalize_excel_value(data.get('last_tested_part')) or '0'
-            if last_tested_part not in last_part_choices:
-                last_tested_part = '0'
-
-            birth_date = parse_excel_birth_date(data.get('birth_date'))
-
-            Student.objects.create(
-                full_name=full_name,
-                student_phone=normalize_excel_value(data.get('student_phone')),
-                parent_phone=normalize_excel_value(data.get('parent_phone')),
-                identity_number=identity_number,
-                jamiaa_id=normalize_excel_value(data.get('jamiaa_id')),
-                parent_identity=normalize_excel_value(data.get('parent_identity')),
-                grade=grade,
-                birth_date=birth_date,
-                last_tested_part=last_tested_part,
-                previous_center=normalize_excel_value(data.get('previous_center')),
-                neighborhood=normalize_excel_value(data.get('neighborhood')),
-                status=status_default,
-            )
-            created_count += 1
-
-        if created_count > 0:
-            form = StudentBulkUploadForm()
-
-        result = {
-            'created_count': created_count,
-            'skipped_count': skipped_count,
-            'row_errors': row_errors,
-        }
-
-    return render(request, 'bulk_students_upload.html', {
-        'form': form,
-        'result': result,
-    })
-
-
-@login_required
-@user_passes_test(lambda user: user.is_superuser)
-def superuser_template_upload(request):
-    form = MemorizationTemplateUploadForm(request.POST or None, request.FILES or None)
-    result = None
-
-    if request.method == 'POST' and form.is_valid():
-        uploaded_file = form.cleaned_data['excel_file']
-
-        try:
-            workbook = load_workbook(uploaded_file, data_only=True)
-            parsed = parse_memorization_bundle_from_workbook(workbook)
-
-            MemorizationTemplateBundle.objects.filter(is_active=True).update(is_active=False)
-            saved_bundle = MemorizationTemplateBundle.objects.create(
-                name='قوالب حفظ مرفوعة من المدير',
-                source_filename=uploaded_file.name,
-                template_definitions=parsed['template_definitions'],
-                memorization_data=parsed['memorization_data'],
-                is_active=True,
-                uploaded_by=request.user,
-            )
-
-            result = {
-                'saved': True,
-                'bundle_id': saved_bundle.id,
-                'template_count': len(parsed['template_definitions']),
-                'source_filename': uploaded_file.name,
-            }
-            form = MemorizationTemplateUploadForm()
-        except ValueError as exc:
-            form.add_error('excel_file', str(exc))
-        except Exception:
-            form.add_error('excel_file', 'تعذر معالجة الملف. تأكد أن الملف مطابق لصيغة قوالب الحفظ المعتمدة.')
-
-    active_bundle = MemorizationTemplateBundle.objects.filter(is_active=True).first()
-
-    return render(request, 'superuser_template_upload.html', {
-        'form': form,
-        'result': result,
-        'active_bundle': active_bundle,
-    })
-
-
-@login_required
-def active_memorization_bundle_api(request):
-    bundle = MemorizationTemplateBundle.objects.filter(is_active=True).first()
-    if not bundle:
-        return JsonResponse({'available': False})
+    setattr(att, f'period_{period_num}', status)
+    att._changed_by = request.user  # for the audit trail in save()
+    att.save()
 
     return JsonResponse({
-        'available': True,
-        'templateDefinitions': bundle.template_definitions,
-        'memorizationData': bundle.memorization_data,
-        'uploadedAt': bundle.created_at.isoformat(),
-        'sourceFilename': bundle.source_filename,
+        'ok': True,
+        'attendance_id': att.id,
+        'is_finalized': att.is_finalized,
     })
 
+
 @login_required
-def teacher_dashboard(request):
-    """لوحة تحكم المعلم - عرض الإحصائيات"""
-    # جلب طلاب المعلم
-    students = Student.objects.filter(teacher=request.user, status='منتظم').order_by('full_name')
+def finalize_attendance(request):
+    """AJAX endpoint: mark the day's attendance as finalized (locked).
 
-    # فلترة التاريخ لعرض الإحصائيات في نطاق محدد
-    today = timezone.now().date()
-    start_date_str = (request.GET.get('start_date') or '').strip()
-    end_date_str = (request.GET.get('end_date') or '').strip()
+    Stage accounts finalize their own stage; the manager finalizes whichever
+    stage tab is currently active (sent via the `stage` POST parameter).
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST only'})
 
-    try:
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date() if start_date_str else None
-    except ValueError:
-        start_date = None
+    date_str = request.POST.get('date')
+    stage_code = request.POST.get('stage')
 
     try:
-        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date() if end_date_str else None
-    except ValueError:
-        end_date = None
+        att_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'invalid date'})
 
-    if start_date and end_date and start_date > end_date:
-        start_date, end_date = end_date, start_date
-    
-    # إحصائيات عامة
-    total_students = students.count()
-    
-    stats_rows = []
+    if request.user.is_superuser:
+        target_stage = stage_code
+    else:
+        user_stage = get_user_stage(request.user)
+        target_stage = user_stage
+
+    if not target_stage:
+        return JsonResponse({'ok': False, 'error': 'no stage specified'})
+
+    students = Student.objects.filter(stage=target_stage)
+    attendance_ids = []
     for student in students:
-        attendances = Attendance.objects.filter(student=student)
-        if start_date:
-            attendances = attendances.filter(date__gte=start_date)
-        if end_date:
-            attendances = attendances.filter(date__lte=end_date)
-        
-        total_days = attendances.count()
-        present = attendances.filter(status='حاضر').count()
-        absent = attendances.filter(status='غائب').count()
-        absent_excused = attendances.filter(status='غياب بعذر').count()
-        excused = attendances.filter(status='مستأذن').count()
-        late = attendances.filter(status='متأخر').count()
-        
-        # عدد الأيام غير الحاضر (غياب + استئذان + تأخير)
-        non_present_count = absent + absent_excused + excused + late
-        
-        # جميع الحضور مع الحالة
-        all_attendance = list(attendances.values('date', 'status').order_by('-date'))
-        
-        stats_rows.append((student.id, {
-            'student': student,
-            'total_days': total_days,
-            'present': present,
-            'absent': absent,
-            'absent_excused': absent_excused,
-            'excused': excused,
-            'late': late,
-            'non_present_count': non_present_count,
-            'all_attendance': all_attendance
-        }))
+        att, created = Attendance.objects.get_or_create(
+            student=student, date=att_date,
+        )
+        if not att.is_finalized:
+            att.is_finalized = True
+            att._changed_by = request.user
+            att.save()
+        attendance_ids.append(att.id)
 
-    stats_rows.sort(key=lambda item: (-item[1]['absent'], item[1]['student'].full_name or ''))
-    attendance_stats = {student_id: stats for student_id, stats in stats_rows}
-    
-    context = {
-        'total_students': total_students,
-        'attendance_stats': attendance_stats,
-        'start_date': start_date,
-        'end_date': end_date,
+    # Fire the notification stub — see TODO in the function definition.
+    # This is where the WhatsApp/SMS notification service would plug in.
+    notify_parents_of_negative_attendance(attendance_ids)
+
+    return JsonResponse({
+        'ok': True,
+        'finalized_count': len(attendance_ids),
+        'stage': target_stage,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Add student page
+# ---------------------------------------------------------------------------
+
+@login_required
+def add_student(request):
+    """Add a new student.
+
+    Manager: can choose any stage and any teacher within that stage.
+    Stage account: stage is fixed to their managed_stage, teacher dropdown
+    shows only teachers in their stage.
+    """
+    is_manager = request.user.is_superuser
+    user_stage = get_user_stage(request.user)
+
+    if request.method == 'POST':
+        national_id = request.POST.get('national_id', '').strip()
+        full_name = request.POST.get('full_name', '').strip()
+        student_phone = request.POST.get('student_phone', '').strip()
+        parent_phone = request.POST.get('parent_phone', '').strip()
+
+        if is_manager:
+            stage = request.POST.get('stage', '').strip()
+        else:
+            stage = user_stage or ''
+        teacher_id = request.POST.get('teacher', '').strip()
+
+        # --- Validation ---
+        errors = []
+        if not national_id:
+            errors.append('رقم الهوية مطلوب')
+        elif not national_id.isdigit() or len(national_id) != 10:
+            errors.append('رقم الهوية يجب أن يكون 10 أرقام')
+        elif Student.objects.filter(national_id=national_id).exists():
+            errors.append('رقم الهوية موجود مسبقاً')
+
+        if not full_name:
+            errors.append('الاسم مطلوب')
+
+        if stage not in [c[0] for c in STAGE_CHOICES]:
+            errors.append('المرحلة غير صحيحة')
+
+        teacher = None
+        if teacher_id:
+            try:
+                teacher = Teacher.objects.get(id=teacher_id)
+                if teacher.stage != stage:
+                    errors.append('المعلم لا ينتمي لهذه المرحلة')
+            except Teacher.DoesNotExist:
+                errors.append('المعلم غير صحيح')
+
+        if errors:
+            teachers_in_stage = Teacher.objects.filter(stage=stage) if stage else Teacher.objects.none()
+            return render(request, 'add_student.html', {
+                'is_manager': is_manager,
+                'user_stage': user_stage,
+                'stage_choices': STAGE_CHOICES,
+                'teachers_in_stage': teachers_in_stage,
+                'errors': errors,
+                'form_data': {
+                    'national_id': national_id,
+                    'full_name': full_name,
+                    'stage': stage,
+                    'teacher': teacher_id,
+                    'student_phone': student_phone,
+                    'parent_phone': parent_phone,
+                },
+            })
+
+        Student.objects.create(
+            national_id=national_id,
+            full_name=full_name,
+            stage=stage,
+            teacher=teacher,
+            student_phone=student_phone,
+            parent_phone=parent_phone,
+        )
+
+        teachers_in_stage = Teacher.objects.filter(stage=stage)
+        return render(request, 'add_student.html', {
+            'is_manager': is_manager,
+            'user_stage': user_stage,
+            'stage_choices': STAGE_CHOICES,
+            'teachers_in_stage': teachers_in_stage,
+            'success': True,
+            'success_name': full_name,
+        })
+
+    # GET: pre-populate teachers for the right stage
+    if is_manager:
+        initial_stage = request.GET.get('stage', '')
+        teachers_in_stage = Teacher.objects.filter(stage=initial_stage) if initial_stage else Teacher.objects.none()
+    else:
+        initial_stage = user_stage or ''
+        teachers_in_stage = Teacher.objects.filter(stage=user_stage) if user_stage else Teacher.objects.none()
+
+    return render(request, 'add_student.html', {
+        'is_manager': is_manager,
+        'user_stage': user_stage,
+        'stage_choices': STAGE_CHOICES,
+        'teachers_in_stage': teachers_in_stage,
+        'initial_stage': initial_stage,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Admin pages: statistics + add teacher (manager only)
+# ---------------------------------------------------------------------------
+
+@login_required
+def teachers_api(request):
+    """Return teachers for a given stage as JSON (used by add_student JS)."""
+    stage = request.GET.get('stage', '').strip()
+    if stage not in [c[0] for c in STAGE_CHOICES]:
+        return JsonResponse({'teachers': []})
+    teachers = Teacher.objects.filter(stage=stage).order_by('name')
+    return JsonResponse({
+        'teachers': [{'id': t.id, 'name': t.name} for t in teachers],
+    })
+
+
+@login_required
+def admin_statistics(request):
+    """Manager-only page showing per-stage attendance statistics.
+
+    For each stage shows: total students, students absent today (period_1 =
+    غائب), students not yet recorded, and whether attendance is finalized.
+    Also shows a per-teacher breakdown within each stage.
+    """
+    if not request.user.is_superuser:
+        return redirect('attendance_page')
+
+    today = timezone.now().date()
+
+    stage_stats = []
+    for stage_code, stage_name in STAGE_CHOICES:
+        students = Student.objects.filter(stage=stage_code)
+        total = students.count()
+
+        today_attendance = Attendance.objects.filter(
+            student__stage=stage_code, date=today,
+        )
+        attendance_map = {att.student_id: att for att in today_attendance}
+
+        recorded_count = today_attendance.count()
+        absent_count = today_attendance.filter(period_1='غائب').count()
+        present_count = today_attendance.filter(period_1='حاضر').count()
+        not_recorded_count = total - recorded_count
+
+        is_finalized = today_attendance.exists() and not today_attendance.filter(is_finalized=False).exists()
+
+        # Per-teacher breakdown
+        teacher_breakdown = []
+        for teacher in Teacher.objects.filter(stage=stage_code).order_by('name'):
+            t_students = students.filter(teacher=teacher)
+            t_total = t_students.count()
+            t_absent = sum(
+                1 for s in t_students
+                if attendance_map.get(s.national_id) and attendance_map[s.national_id].period_1 == 'غائب'
+            )
+            t_recorded = sum(
+                1 for s in t_students
+                if s.national_id in attendance_map
+            )
+            teacher_breakdown.append({
+                'teacher': teacher,
+                'total': t_total,
+                'absent': t_absent,
+                'recorded': t_recorded,
+            })
+
+        # Students with no teacher assigned
+        unassigned = students.filter(teacher__isnull=True).count()
+
+        stage_stats.append({
+            'stage_code': stage_code,
+            'stage_name': stage_name,
+            'total': total,
+            'recorded': recorded_count,
+            'absent': absent_count,
+            'present': present_count,
+            'not_recorded': not_recorded_count,
+            'is_finalized': is_finalized,
+            'teacher_breakdown': teacher_breakdown,
+            'unassigned': unassigned,
+        })
+
+    return render(request, 'admin_statistics.html', {
+        'stage_stats': stage_stats,
         'today': today,
-    }
-    
-    return render(request, 'teacher_dashboard.html', context)
-
-
-@login_required
-def teacher_students_data(request):
-    """عرض بيانات طلاب المعلم الحالي."""
-    preference, _ = TeacherPlanPreference.objects.get_or_create(user=request.user)
-
-    if request.method == 'POST':
-        mem_plan = request.POST.get('mem_plan', preference.mem_plan)
-        big_review_pages = request.POST.get('big_review_pages', preference.big_review_pages)
-
-        if mem_plan not in {'none', '2', '1', '0.5', '0.25'}:
-            mem_plan = '1'
-
-        try:
-            big_review_pages = int(big_review_pages)
-            if big_review_pages < 1:
-                big_review_pages = 1
-        except (TypeError, ValueError):
-            big_review_pages = preference.big_review_pages
-
-        preference.mem_plan = mem_plan
-        preference.big_review_pages = big_review_pages
-        preference.save()
-
-        return redirect('teacher_students_data')
-
-    students = Student.objects.filter(teacher=request.user, status='منتظم').order_by('full_name')
-
-    students_data = []
-    for student in students:
-        try:
-            parts_count = int(student.last_tested_part)
-        except (TypeError, ValueError):
-            parts_count = 0
-
-        students_data.append({
-            'student': student,
-            'parts_count': parts_count,
-        })
-
-    return render(
-        request,
-        'teacher_students_data.html',
-        {
-            'students_data': students_data,
-            'preference': preference,
-        },
-    )
-
-
-@login_required
-def delete_teacher_student(request, student_id):
-    """حذف طالب من قائمة المعلم الحالي."""
-    student = get_object_or_404(Student, id=student_id, teacher=request.user, status='منتظم')
-
-    if request.method == 'POST':
-        student.delete()
-
-    return redirect('teacher_students_data')
-
-
-@login_required
-def teacher_student_plan(request, student_id):
-    """صفحة إنشاء خطة لطالب واحد باستخدام تفضيلات المعلم الافتراضية."""
-    student = get_object_or_404(
-        Student,
-        id=student_id,
-        teacher=request.user,
-        status='منتظم',
-    )
-    preference, _ = TeacherPlanPreference.objects.get_or_create(user=request.user)
-
-    student_payload = {
-        'id': str(student.student_unique_id or student.id),
-        'name': student.full_name,
-        'db_id': student.id,
-    }
-
-    return render(
-        request,
-        'teacher_student_plan.html',
-        {
-            'student': student,
-            'student_payload': student_payload,
-            'preference': preference,
-        },
-    )
-
-
-@login_required
-def update_attendance(request):
-    """تحديث حالة الحضور من لوحة تحكم المعلم"""
-    if request.method == 'POST':
-        from datetime import datetime
-        
-        # جلب جميع البيانات المرسلة
-        for key, value in request.POST.items():
-            if key.startswith('status_'):
-                # استخراج التاريخ والـ student_id
-                # الصيغة: status_YYYY-MM-DD_student_id
-                try:
-                    # إزالة البادئة 'status_'
-                    rest = key.replace('status_', '')
-                    # فصل بآخر underscore لأن التاريخ قد يحتوي على شرطات
-                    last_underscore = rest.rfind('_')
-                    date_str = rest[:last_underscore]
-                    student_id = rest[last_underscore+1:]
-                    
-                    attendance_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                    student = Student.objects.get(id=student_id, teacher=request.user)
-                    
-                    # تحديث حالة الحضور
-                    attendance = Attendance.objects.filter(
-                        student=student,
-                        date=attendance_date
-                    ).first()
-                    
-                    if attendance:
-                        attendance.status = value
-                        attendance.save()
-                except (Student.DoesNotExist, ValueError):
-                    pass
-    
-    return redirect('teacher_dashboard')
-
-@login_required
-def nominate_for_exam(request):
-    """صفحة ترشيح الطلاب للاختبار الداخلي"""
-    # جلب طلاب المعلم
-    students = Student.objects.filter(teacher=request.user, status='منتظم').order_by('full_name')
-
-    existing_nominations = ExamNomination.objects.filter(teacher=request.user)
-    nomination_map = {item.student_id: item.id for item in existing_nominations}
-    
-    if request.method == 'POST':
-        for student in students:
-            teacher_grade = request.POST.get(f'teacher_grade_{student.id}')
-            if teacher_grade:
-                ExamNomination.objects.create(
-                    student=student,
-                    teacher=request.user,
-                    last_tested_part=student.last_tested_part,
-                    teacher_grade=teacher_grade
-                )
-        return redirect('teacher_nominations')
-    
-    return render(request, 'nominate_exam.html', {
-        'students': students,
-        'nomination_map': nomination_map,
+        'weekday_name': get_arabic_weekday_name(today),
     })
 
 
 @login_required
-def delete_nomination(request, nomination_id):
-    """حذف ترشيح طالب من الاختبار"""
-    nomination = get_object_or_404(ExamNomination, id=nomination_id)
-
-    can_delete = (
-        nomination.teacher_id == request.user.id
-        or user_has_role(request.user, 'examiner')
-        or user_has_role(request.user, 'manager')
-        or request.user.is_superuser
-    )
-    if not can_delete:
-        return redirect('home')
+def add_teacher(request):
+    """Manager-only page to add a new teacher and assign them to a stage."""
+    if not request.user.is_superuser:
+        return redirect('attendance_page')
 
     if request.method == 'POST':
-        nomination.delete()
-    next_url = request.POST.get('next') or 'teacher_nominations'
-    return redirect(next_url)
+        name = request.POST.get('name', '').strip()
+        stage = request.POST.get('stage', '').strip()
+        phone = request.POST.get('phone', '').strip()
 
+        errors = []
+        if not name:
+            errors.append('اسم المعلم مطلوب')
+        if stage not in [c[0] for c in STAGE_CHOICES]:
+            errors.append('المرحلة غير صحيحة')
 
-@login_required
-def delete_pending_student(request, student_id):
-    """حذف طالب من قائمة المنتظرين"""
-    if not is_stage_supervisor(request.user):
-        return redirect('home')
-
-    student = get_object_or_404(Student, id=student_id, status='منتظر')
-
-    if not request.user.is_superuser and hasattr(request.user, 'stage_supervisor'):
-        supervisor = request.user.stage_supervisor
-        if student.educational_stage != supervisor.stage:
-            return redirect('pending_students')
-
-    if request.method == 'POST':
-        student.delete()
-    return redirect('pending_students')
-
-
-@login_required
-def teacher_nominations(request):
-    """عرض الطلاب المرشحين من قبل المعلم"""
-    nominations = ExamNomination.objects.filter(teacher=request.user).select_related('student').order_by('student__full_name', '-id')
-
-    nominations_with_next = []
-    for nomination in nominations:
-        nominations_with_next.append({
-            'nomination': nomination,
-            'next_part': nomination.get_next_part()
-        })
-
-    return render(request, 'teacher_nominations.html', {'nominations': nominations_with_next})
-
-@login_required
-def nominated_students(request):
-    """صفحة المرشحين للاختبار"""
-    if not user_has_role(request.user, 'examiner'):
-        return redirect('home')
-
-    nominations = ExamNomination.objects.filter(internal_passed=False).select_related('student', 'teacher').order_by('student__full_name', '-id')
-    
-    if request.method == 'POST':
-        for nomination in nominations:
-            internal_grade = request.POST.get(f'internal_grade_{nomination.id}')
-            if internal_grade:
-                nomination.internal_grade = internal_grade
-                teacher_ok = nomination.teacher_grade is not None and float(nomination.teacher_grade) >= 85
-                internal_ok = float(internal_grade) >= 85
-                nomination.internal_passed = teacher_ok and internal_ok
-                nomination.save()
-        return redirect('nominated_students')
-    
-    # إضافة الجزء التالي لكل ترشيح
-    nominations_with_next = []
-    for nomination in nominations:
-        nominations_with_next.append({
-            'nomination': nomination,
-            'next_part': nomination.get_next_part()
-        })
-
-    mae_source = ExamNomination.objects.filter(
-        teacher_grade__isnull=False,
-        internal_grade__isnull=False,
-    ).select_related('teacher')
-
-    mae_map = {}
-    for nomination in mae_source:
-        teacher = nomination.teacher
-        if teacher.id not in mae_map:
-            mae_map[teacher.id] = {
-                'teacher_name': teacher.get_full_name() or teacher.username,
-                'sum_abs_error': 0.0,
-                'count': 0,
-            }
-
-        abs_error = abs(float(nomination.teacher_grade) - float(nomination.internal_grade))
-        mae_map[teacher.id]['sum_abs_error'] += abs_error
-        mae_map[teacher.id]['count'] += 1
-
-    teacher_mae_rows = []
-    for item in mae_map.values():
-        count = item['count']
-        mae_value = item['sum_abs_error'] / count if count else 0.0
-        teacher_mae_rows.append({
-            'teacher_name': item['teacher_name'],
-            'samples_count': count,
-            'mae': mae_value,
-        })
-
-    teacher_mae_rows.sort(key=lambda row: row['mae'])
-
-    return render(request, 'nominated_students.html', {
-        'nominations': nominations_with_next,
-        'teacher_mae_rows': teacher_mae_rows,
-    })
-
-
-@login_required
-def association_candidates(request):
-    """مرشحو اختبار الجمعية"""
-    if not user_has_role(request.user, 'examiner'):
-        return redirect('home')
-
-    nominations = ExamNomination.objects.filter(internal_passed=True, association_tested=False).select_related('student', 'student__teacher', 'exam_halaqa_teacher').order_by('student__full_name', '-id')
-
-    halaqa_profiles = TeacherProfile.objects.filter(
-        class_name__isnull=False
-    ).exclude(
-        class_name__exact=''
-    ).select_related('user').order_by('class_name', 'user__username')
-    halaqa_teacher_ids = {profile.user_id for profile in halaqa_profiles}
-
-    default_sms_template = (
-        "السلام عليكم ورحمة الله وبركاته\n\n"
-        "نذكركم باختبار ابنكم {{{الاسم_الأول}}} بعدد أجزاء {{{رقم_الجزء}}} في جمعية خيركم\n"
-        "يوم ( يتم كتابة اليوم والتاريخ بشكل يدوي هنا )\n\n"
-        "يرجى الحضور الى جامع الحمودي.\n"
-        "الساعة (يتم كتابة الوقت بشكل يدوي هنا)\n"
-        "من جهة بوابة دورات المياه.\n\n"
-        "وذلك للذهاب مع زملائه الى مقر الجمعية لآداء الاختبار.\n\n"
-        "وجزاكم الله خيراً\n"
-        "نرجو الالتزام بالموعد المحدد"
-    )
-
-    default_teacher_template = (
-        "السلام عليكم ورحمة الله وبركاته\n\n"
-        "نذكركم بأن طالبكم {{{الاسم_الأول}}} مرشح لاختبار جزء {{{رقم_الجزء}}} في جمعية خيركم.\n\n"
-        "بارك الله فيكم"
-    )
-
-    saved_sms_template = SmsTemplateSetting.objects.filter(
-        user=request.user,
-        section='association_exam'
-    ).values_list('template_text', flat=True).first()
-
-    saved_teacher_template = SmsTemplateSetting.objects.filter(
-        user=request.user,
-        section='association_exam_teacher'
-    ).values_list('template_text', flat=True).first()
-
-    association_sms_template = saved_sms_template or default_sms_template
-    posted_sms_template = request.POST.get('association_sms_template')
-    if posted_sms_template is not None:
-        association_sms_template = posted_sms_template
-
-    association_teacher_sms_template = saved_teacher_template or default_teacher_template
-    posted_teacher_template = request.POST.get('association_teacher_sms_template')
-    if posted_teacher_template is not None:
-        association_teacher_sms_template = posted_teacher_template
-
-    sms_feedback = None
-    template_save_feedback = None
-
-    if request.method == 'POST':
-        form_action = request.POST.get('form_action')
-
-        if form_action == 'save_association_sms_template':
-            template_text = (request.POST.get('association_sms_template') or '').strip() or default_sms_template
-            SmsTemplateSetting.objects.update_or_create(
-                user=request.user,
-                section='association_exam',
-                defaults={'template_text': template_text},
-            )
-            association_sms_template = template_text
-            template_save_feedback = 'تم حفظ قالب رسالة اختبار الجمعية بنجاح.'
-
-        elif form_action == 'save_association_teacher_sms_template':
-            template_text = (request.POST.get('association_teacher_sms_template') or '').strip() or default_teacher_template
-            SmsTemplateSetting.objects.update_or_create(
-                user=request.user,
-                section='association_exam_teacher',
-                defaults={'template_text': template_text},
-            )
-            association_teacher_sms_template = template_text
-            template_save_feedback = 'تم حفظ قالب رسالة المعلمين بنجاح.'
-
-        elif form_action == 'send_association_sms':
-            selected_ids_csv = (request.POST.get('selected_nomination_ids_csv') or '').strip()
-            selected_ids = []
-            if selected_ids_csv:
-                for raw_id in selected_ids_csv.split(','):
-                    raw_id = raw_id.strip()
-                    if not raw_id:
-                        continue
-                    try:
-                        selected_ids.append(int(raw_id))
-                    except ValueError:
-                        continue
-
-            selected_nominations = list(nominations.filter(id__in=selected_ids)) if selected_ids else []
-
-            if not selected_nominations:
-                sms_feedback = {
-                    'success_count': 0,
-                    'failed_count': 0,
-                    'failures': ['لم يتم تحديد أي طالب لإرسال الرسالة.'],
-                }
-            else:
-                today = timezone.now().date()
-                today_date_str = today.strftime('%Y-%m-%d')
-
-                # Per-recipient buckets so multi-student parents/teachers get one combined message.
-                student_messages = []  # direct-to-student
-                parent_groups = {}     # parent_phone -> list of rendered chunks
-                teacher_groups = {}    # teacher_phone -> list of rendered chunks
-                summary_lines = []
-                student_count = 0
-                parent_recipient_count = 0
-                teacher_recipient_count = 0
-
-                for nomination in selected_nominations:
-                    student = nomination.student
-                    full_name = (student.full_name or '').strip()
-                    first_name = full_name.split()[0] if full_name else ''
-                    part_number = nomination.get_next_part()
-
-                    parent_phone = normalize_saudi_phone(student.parent_phone) if student.parent_phone else ''
-                    student_phone = normalize_saudi_phone(student.student_phone) if student.student_phone else ''
-
-                    teacher_user = student.teacher
-                    teacher_name = ''
-                    teacher_phone = ''
-                    if teacher_user:
-                        teacher_name = (teacher_user.get_full_name() or teacher_user.username or '').strip()
-                        try:
-                            profile = teacher_user.teacher_profile
-                            teacher_phone = normalize_saudi_phone(profile.phone) if profile and profile.phone else ''
-                        except TeacherProfile.DoesNotExist:
-                            teacher_phone = ''
-
-                    halaqa_name = ''
-                    if nomination.exam_halaqa_teacher_id:
-                        try:
-                            halaqa_profile = nomination.exam_halaqa_teacher.teacher_profile
-                            halaqa_name = (halaqa_profile.class_name or '').strip()
-                        except TeacherProfile.DoesNotExist:
-                            halaqa_name = ''
-
-                    parent_row = {
-                        'first_name': first_name,
-                        'full_name': full_name,
-                        'phone_number': parent_phone,
-                        'part_number': part_number,
-                        'today_date': today_date_str,
-                    }
-                    parent_msg = render_message_template(association_sms_template, parent_row)
-
-                    teacher_row = {
-                        'first_name': first_name,
-                        'full_name': full_name,
-                        'phone_number': teacher_phone,
-                        'part_number': part_number,
-                        'teacher_name': teacher_name,
-                        'today_date': today_date_str,
-                    }
-                    teacher_msg = render_message_template(association_teacher_sms_template, teacher_row)
-
-                    if student_phone and parent_msg:
-                        student_messages.append({
-                            'phone': student_phone,
-                            'text': parent_msg,
-                            'label': f'طالب: {full_name}',
-                        })
-                        student_count += 1
-
-                    if parent_phone and parent_msg:
-                        parent_groups.setdefault(parent_phone, []).append(parent_msg)
-
-                    if teacher_phone and teacher_msg:
-                        teacher_groups.setdefault(teacher_phone, []).append(teacher_msg)
-
-                    summary_lines.append(
-                        f"- {full_name or '—'} | جزء {part_number} | حلقة الاختبار: {halaqa_name or '—'} | المعلم: {teacher_name or '—'}"
-                    )
-
-                messages_to_send = []
-                messages_to_send.extend(student_messages)
-
-                joiner = '\n\n———\n\n'
-
-                for phone, chunks in parent_groups.items():
-                    text = chunks[0] if len(chunks) == 1 else joiner.join(chunks)
-                    messages_to_send.append({
-                        'phone': phone,
-                        'text': text,
-                        'label': f'ولي أمر ({len(chunks)} طالب)' if len(chunks) > 1 else 'ولي أمر',
-                    })
-                    parent_recipient_count += 1
-
-                for phone, chunks in teacher_groups.items():
-                    text = chunks[0] if len(chunks) == 1 else joiner.join(chunks)
-                    messages_to_send.append({
-                        'phone': phone,
-                        'text': text,
-                        'label': f'معلم ({len(chunks)} طالب)' if len(chunks) > 1 else 'معلم',
-                    })
-                    teacher_recipient_count += 1
-
-                admin_phone = (getattr(settings, 'WHATSAPP_ADMIN_NUMBER', '') or '').strip()
-                if admin_phone:
-                    summary_text = (
-                        "📋 ملخص رسائل اختبار الجمعية\n"
-                        f"التاريخ: {today_date_str}\n"
-                        f"عدد الطلاب: {len(selected_nominations)}\n"
-                        f"رسائل الطلاب المباشرة: {student_count}\n"
-                        f"عدد أولياء الأمور: {parent_recipient_count}\n"
-                        f"عدد المعلمين: {teacher_recipient_count}\n\n"
-                        "القائمة:\n" + "\n".join(summary_lines)
-                    )
-                    messages_to_send.append({
-                        'phone': admin_phone,
-                        'text': summary_text,
-                        'label': 'ملخص الإدارة',
-                    })
-
-                if not messages_to_send:
-                    sms_feedback = {
-                        'success_count': 0,
-                        'failed_count': 0,
-                        'failures': ['لا توجد أرقام صالحة لإرسال الرسائل.'],
-                    }
-                else:
-                    sms_feedback = send_whatsapp_batch(messages_to_send)
-
-        else:
-            for nomination in nominations:
-                exam_halaqa_teacher_raw = (request.POST.get(f'exam_halaqa_teacher_{nomination.id}') or '').strip()
-                if exam_halaqa_teacher_raw:
-                    try:
-                        selected_halaqa_teacher_id = int(exam_halaqa_teacher_raw)
-                    except ValueError:
-                        selected_halaqa_teacher_id = None
-                    if selected_halaqa_teacher_id not in halaqa_teacher_ids:
-                        selected_halaqa_teacher_id = None
-                else:
-                    selected_halaqa_teacher_id = None
-
-                nomination.exam_halaqa_teacher_id = selected_halaqa_teacher_id
-                association_grade = request.POST.get(f'association_grade_{nomination.id}')
-                if association_grade:
-                    nomination.association_grade = association_grade
-                    nomination.association_tested = True
-                nomination.save()
-            return redirect('association_candidates')
-
-    nominations_with_next = []
-    for nomination in nominations:
-        nominations_with_next.append({
-            'nomination': nomination,
-            'next_part': nomination.get_next_part()
-        })
-
-    return render(request, 'association_candidates.html', {
-        'nominations': nominations_with_next,
-        'halaqa_profiles': halaqa_profiles,
-        'association_sms_template': association_sms_template,
-        'association_teacher_sms_template': association_teacher_sms_template,
-        'sms_feedback': sms_feedback,
-        'template_save_feedback': template_save_feedback,
-    })
-
-
-@login_required
-def association_results(request):
-    """نتائج اختبار الجمعية"""
-    if not (user_has_role(request.user, 'examiner') or user_has_role(request.user, 'manager')):
-        return redirect('home')
-
-    nominations = ExamNomination.objects.filter(association_tested=True).select_related('student').order_by('student__full_name', '-id')
-    return render(request, 'association_results.html', {'nominations': nominations})
-
-
-@login_required
-def preparer_attendance_summary(request):
-    """متابعة تحضير المعلمين لليوم"""
-    if not can_access_preparer_attendance(request.user):
-        return redirect('home')
-
-    target_date = timezone.now().date()
-    teachers = User.objects.filter(student__isnull=False).distinct().order_by('username')
-    pending = []
-    completed = []
-
-    for teacher in teachers:
-        student_count = Student.objects.filter(teacher=teacher, status='منتظم').count()
-        if student_count == 0:
-            continue
-        attendance_qs = Attendance.objects.filter(student__teacher=teacher, date=target_date)
-        recorded_count = attendance_qs.count()
-        display_name = teacher.get_full_name() or teacher.username
-
-        if attendance_qs.count() >= student_count:
-            last_time = attendance_qs.aggregate(last_time=Max('created_at'))['last_time']
-            completed.append({
-                'teacher': teacher,
-                'display_name': display_name,
-                'student_count': student_count,
-                'recorded_count': recorded_count,
-                'last_time': last_time,
-            })
-        else:
-            pending.append({
-                'teacher': teacher,
-                'display_name': display_name,
-                'student_count': student_count,
-                'recorded_count': recorded_count,
+        if errors:
+            return render(request, 'add_teacher.html', {
+                'stage_choices': STAGE_CHOICES,
+                'errors': errors,
+                'form_data': {'name': name, 'stage': stage, 'phone': phone},
             })
 
-    context = {
-        'target_date': target_date,
-        'pending': pending,
-        'completed': completed,
-    }
-    return render(request, 'preparer_attendance_summary.html', context)
+        Teacher.objects.create(name=name, stage=stage, phone=phone)
 
+        teachers = Teacher.objects.all().order_by('stage', 'name')
+        return render(request, 'add_teacher.html', {
+            'stage_choices': STAGE_CHOICES,
+            'teachers': teachers,
+            'success': True,
+            'success_name': name,
+        })
+
+    teachers = Teacher.objects.all().order_by('stage', 'name')
+    return render(request, 'add_teacher.html', {
+        'stage_choices': STAGE_CHOICES,
+        'teachers': teachers,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Teacher attendance (mirrors student attendance structure)
+# ---------------------------------------------------------------------------
 
 @login_required
-def preparer_take_attendance(request):
-    """تحضير المعلمين - للمحضّر فقط"""
-    if not can_access_preparer_attendance(request.user):
-        return redirect('home')
+def teacher_attendance_page(request):
+    """Take attendance for teachers (4 periods per day).
 
-    # teachers = User.objects.filter(student__isnull=False).distinct().order_by('username')
-    teachers = User.objects.distinct().order_by('username')
-
-    today = timezone.now().date()
-    selected_date_str = request.POST.get('attendance_date') or request.GET.get('date') or str(today)
+    Manager: sees all 5 stages via tabs.
+    Stage account: sees only their stage's teachers.
+    """
+    selected_date_str = request.GET.get('date') or str(timezone.now().date())
     try:
         selected_date = datetime.strptime(selected_date_str, "%Y-%m-%d").date()
     except ValueError:
-        selected_date = today
+        selected_date = timezone.now().date()
 
-    weekday_map = {
-        6: 'الأحد',
-        0: 'الاثنين',
-        1: 'الثلاثاء',
-        2: 'الأربعاء',
-        3: 'الخميس',
-    }
-    current_weekday = weekday_map.get(selected_date.weekday(), 'الأحد')
-    current_week = AcademicCalendar.get_week_from_date(selected_date)
+    is_manager = request.user.is_superuser
+    user_stage = get_user_stage(request.user)
 
-    success = False
-    if request.method == 'POST':
-        posted_date_str = request.POST.get('attendance_date', str(selected_date))
-        try:
-            posted_date = datetime.strptime(posted_date_str, "%Y-%m-%d").date()
-        except ValueError:
-            posted_date = selected_date
+    if is_manager:
+        stages = STAGE_CHOICES
+    elif user_stage:
+        stages = [(user_stage, user_stage)]
+    else:
+        stages = []
 
-        selected_weekday = weekday_map.get(posted_date.weekday(), 'الأحد')
-        selected_week = AcademicCalendar.get_week_from_date(posted_date)
+    stages_data = []
+    for stage_code, stage_name in stages:
+        teachers = Teacher.objects.filter(stage=stage_code).order_by('name')
+        attendance_records = TeacherAttendance.objects.filter(
+            teacher__stage=stage_code, date=selected_date
+        )
+        attendance_map = {att.teacher_id: att for att in attendance_records}
 
+        teacher_rows = []
         for teacher in teachers:
-            status = request.POST.get(f'status_{teacher.id}')
-            if status:
-                TeacherAttendance.objects.update_or_create(
-                    teacher=teacher,
-                    date=posted_date,
-                    defaults={
-                        'status': status,
-                        'weekday': selected_weekday,
-                        'week_number': selected_week
-                    }
-                )
+            att = attendance_map.get(teacher.id)
+            teacher_rows.append({
+                'teacher': teacher,
+                'attendance_id': att.id if att else None,
+                'is_finalized': att.is_finalized if att else False,
+                'period_1': att.period_1 if att else 'حاضر',
+                'period_2': att.period_2 if att else 'حاضر',
+                'period_3': att.period_3 if att else 'حاضر',
+                'period_4': att.period_4 if att else 'حاضر',
+            })
 
-        success = True
-        selected_date = posted_date
-        current_weekday = selected_weekday
-        current_week = selected_week
-
-    existing_attendance = TeacherAttendance.objects.filter(teacher__in=teachers, date=selected_date)
-    attendance_map = {item.teacher_id: item.status for item in existing_attendance}
-
-    teachers_with_status = []
-    for teacher in teachers:
-        status = attendance_map.get(teacher.id, 'حاضر')
-        display_name = teacher.get_full_name() or teacher.username
-        teachers_with_status.append({
-            'teacher': teacher,
-            'display_name': display_name,
-            'status': status,
+        stages_data.append({
+            'stage_code': stage_code,
+            'stage_name': stage_name,
+            'teachers': teacher_rows,
         })
 
-    teachers_with_status.sort(key=lambda item: item['display_name'])
-
     context = {
-        'teachers_with_status': teachers_with_status,
-        'current_weekday': current_weekday,
-        'current_week': current_week,
+        'stages_data': stages_data,
         'selected_date': selected_date,
-        'today': today,
-        'success': success,
+        'today': timezone.now().date(),
+        'is_manager': is_manager,
+        'user_stage': user_stage,
+        'weekday_name': get_arabic_weekday_name(selected_date),
     }
-
-    return render(request, 'preparer_take_attendance.html', context)
+    return render(request, 'teacher_attendance.html', context)
 
 
 @login_required
-def preparer_take_students_attendance(request):
-    """تحضير طلاب أي معلم - للمحضّر أو المدير"""
-    if not can_access_preparer_attendance(request.user):
-        return redirect('home')
+def save_teacher_period(request):
+    """AJAX endpoint: save a single period's status for one teacher/date."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST only'})
 
-    teachers = User.objects.filter(student__status='منتظم').distinct().order_by('username')
+    teacher_id = request.POST.get('teacher_id')
+    date_str = request.POST.get('date')
+    period_num = request.POST.get('period')
+    status = request.POST.get('status')
 
-    today = timezone.now().date()
-    selected_date_str = request.POST.get('attendance_date') or request.GET.get('date') or str(today)
-    selected_teacher_id = request.POST.get('teacher_id') or request.GET.get('teacher_id')
+    try:
+        att_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'invalid date'})
 
+    if period_num not in ('1', '2', '3', '4'):
+        return JsonResponse({'ok': False, 'error': 'invalid period'})
+
+    valid_statuses = [c[0] for c in PERIOD_STATUS_CHOICES]
+    if status not in valid_statuses:
+        return JsonResponse({'ok': False, 'error': 'invalid status'})
+
+    teacher = get_object_or_404(Teacher, id=teacher_id)
+
+    # Permission: stage account can only edit their own stage's teachers.
+    user_stage = get_user_stage(request.user)
+    if user_stage and teacher.stage != user_stage:
+        return JsonResponse({'ok': False, 'error': 'permission denied'})
+
+    att, created = TeacherAttendance.objects.get_or_create(
+        teacher=teacher, date=att_date,
+    )
+
+    if att.is_finalized and not request.user.is_superuser:
+        return JsonResponse({'ok': False, 'error': 'finalized'})
+
+    setattr(att, f'period_{period_num}', status)
+    att.save()
+
+    return JsonResponse({
+        'ok': True,
+        'attendance_id': att.id,
+        'is_finalized': att.is_finalized,
+    })
+
+
+@login_required
+def finalize_teacher_attendance(request):
+    """AJAX endpoint: finalize teacher attendance for a stage/date."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST only'})
+
+    date_str = request.POST.get('date')
+    stage_code = request.POST.get('stage')
+
+    try:
+        att_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'invalid date'})
+
+    if request.user.is_superuser:
+        target_stage = stage_code
+    else:
+        user_stage = get_user_stage(request.user)
+        target_stage = user_stage
+
+    if not target_stage:
+        return JsonResponse({'ok': False, 'error': 'no stage specified'})
+
+    teachers = Teacher.objects.filter(stage=target_stage)
+    count = 0
+    for teacher in teachers:
+        att, created = TeacherAttendance.objects.get_or_create(
+            teacher=teacher, date=att_date,
+        )
+        if not att.is_finalized:
+            att.is_finalized = True
+            att.save()
+            count += 1
+
+    return JsonResponse({
+        'ok': True,
+        'finalized_count': count,
+        'stage': target_stage,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Status pages (summary with drill-down)
+# ---------------------------------------------------------------------------
+
+@login_required
+def student_status_page(request):
+    """Summary of student attendance status for a given date.
+
+    Shows counts per status (present, absent, late, etc.) with drill-down
+    to see which students and which periods.
+    """
+    selected_date_str = request.GET.get('date') or str(timezone.now().date())
     try:
         selected_date = datetime.strptime(selected_date_str, "%Y-%m-%d").date()
     except ValueError:
-        selected_date = today
+        selected_date = timezone.now().date()
 
-    weekday_map = {
-        6: 'الأحد',
-        0: 'الاثنين',
-        1: 'الثلاثاء',
-        2: 'الأربعاء',
-        3: 'الخميس',
-    }
-    current_weekday = weekday_map.get(selected_date.weekday(), 'الأحد')
-    current_week = AcademicCalendar.get_week_from_date(selected_date)
+    is_manager = request.user.is_superuser
+    user_stage = get_user_stage(request.user)
 
-    selected_teacher = None
-    students = Student.objects.none()
-    if selected_teacher_id:
-        try:
-            selected_teacher = teachers.get(id=selected_teacher_id)
-            students = Student.objects.filter(teacher=selected_teacher, status='منتظم').order_by('full_name')
-        except (User.DoesNotExist, ValueError, TypeError):
-            selected_teacher = None
-            students = Student.objects.none()
+    if is_manager:
+        stage_filter = request.GET.get('stage', '')
+        students = Student.objects.all()
+        if stage_filter:
+            students = students.filter(stage=stage_filter)
+    elif user_stage:
+        students = Student.objects.filter(stage=user_stage)
+        stage_filter = user_stage
+    else:
+        students = Student.objects.none()
+        stage_filter = ''
 
-    success = False
-    error_message = None
+    attendance_records = Attendance.objects.filter(
+        student__in=students, date=selected_date
+    ).select_related('student')
 
-    if request.method == 'POST':
-        posted_date_str = request.POST.get('attendance_date', str(selected_date))
-        try:
-            posted_date = datetime.strptime(posted_date_str, "%Y-%m-%d").date()
-        except ValueError:
-            posted_date = selected_date
+    # Build status summary: for each status, collect (student_name, periods)
+    status_details = {}
+    for status_code, status_label in PERIOD_STATUS_CHOICES:
+        status_details[status_code] = {
+            'label': status_label,
+            'entries': [],
+        }
 
-        selected_weekday = weekday_map.get(posted_date.weekday(), 'الأحد')
-        selected_week = AcademicCalendar.get_week_from_date(posted_date)
+    for att in attendance_records:
+        for period_num, field_name in enumerate(
+            ['period_1', 'period_2', 'period_3', 'period_4'], start=1
+        ):
+            val = getattr(att, field_name)
+            if val in status_details:
+                status_details[val]['entries'].append({
+                    'student_name': att.student.full_name,
+                    'student_stage': att.student.stage,
+                    'teacher_name': att.student.teacher.name if att.student.teacher else 'غير محدد',
+                    'period': period_num,
+                })
 
-        if not selected_teacher:
-            error_message = 'يرجى اختيار المعلم أولاً.'
-        else:
-            for student in students:
-                status = request.POST.get(f'status_{student.id}')
-                if status:
-                    Attendance.objects.update_or_create(
-                        student=student,
-                        date=posted_date,
-                        defaults={
-                            'status': status,
-                            'weekday': selected_weekday,
-                            'week_number': selected_week,
-                        }
-                    )
-
-            success = True
-            selected_date = posted_date
-            current_weekday = selected_weekday
-            current_week = selected_week
-
-    existing_attendance = Attendance.objects.filter(student__in=students, date=selected_date)
-    attendance_map = {item.student_id: item.status for item in existing_attendance}
-
-    students_with_status = []
-    for student in students:
-        status = attendance_map.get(student.id, 'حاضر')
-        students_with_status.append({
-            'student': student,
-            'status': status,
-        })
-
-    teachers_with_names = []
-    for teacher in teachers:
-        teachers_with_names.append({
-            'teacher': teacher,
-            'display_name': teacher.get_full_name() or teacher.username,
-        })
-
-    teachers_with_names.sort(key=lambda item: item['display_name'])
+    # Sort entries by student name within each status
+    for status_code in status_details:
+        status_details[status_code]['entries'].sort(key=lambda x: x['student_name'])
 
     context = {
-        'teachers': teachers_with_names,
-        'selected_teacher': selected_teacher,
-        'students_with_status': students_with_status,
+        'status_details': status_details,
         'selected_date': selected_date,
-        'today': today,
-        'current_weekday': current_weekday,
-        'current_week': current_week,
-        'success': success,
-        'error_message': error_message,
+        'today': timezone.now().date(),
+        'is_manager': is_manager,
+        'user_stage': user_stage,
+        'stage_choices': STAGE_CHOICES,
+        'stage_filter': stage_filter,
+        'weekday_name': get_arabic_weekday_name(selected_date),
+        'total_students': students.count(),
+        'recorded_count': attendance_records.values('student').distinct().count(),
     }
-    return render(request, 'preparer_take_students_attendance.html', context)
+    return render(request, 'student_status.html', context)
 
 
 @login_required
-def preparer_absent_contacts(request):
-    """أرقام أولياء الأمور للغائبين وإحصائية الغياب"""
-    if not user_has_role(request.user, 'preparer'):
-        return redirect('home')
+def teacher_status_page(request):
+    """Summary of teacher attendance status for a given date.
 
-    target_date_str = request.GET.get('date') or request.POST.get('date') or str(timezone.now().date())
-    download_type = request.GET.get('download')
+    Shows counts per status (present, absent, late, etc.) with drill-down
+    to see which teachers and which periods.
+    """
+    selected_date_str = request.GET.get('date') or str(timezone.now().date())
     try:
-        target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+        selected_date = datetime.strptime(selected_date_str, "%Y-%m-%d").date()
     except ValueError:
-        target_date = timezone.now().date()
+        selected_date = timezone.now().date()
 
     default_templates = {
         'absent': 'ولي الأمر المكرم، نفيدكم بغياب الابن {{{الاسم_الأول}}} اليوم {{{اليوم}}} {{{التاريخ}}}. مجموع أيام غيابه حتى الآن: ({{{المجموع}}}) أيام. للاستفسار: المعلم {{{اسم_المعلم}}} - {{{جوال_المعلم}}}.\nإدارة جامع الحمودي',
