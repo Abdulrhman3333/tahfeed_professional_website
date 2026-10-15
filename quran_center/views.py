@@ -1878,7 +1878,7 @@ def preparer_take_attendance(request):
 
 @login_required
 def preparer_take_students_attendance(request):
-    """تحضير طلاب أي معلم - للمحضّر أو المدير"""
+    """تحضير طلاب أي معلم - للمحضّر فقط"""
     if not can_access_preparer_attendance(request.user):
         return redirect('home')
 
