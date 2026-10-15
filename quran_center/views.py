@@ -82,8 +82,8 @@ def user_has_role(user, role_code):
 
 
 def can_access_preparer_attendance(user):
-    """السماح للمحضّر أو المشرف (بأنواعه) بالدخول لصفحات متابعة/تحضير الحضور العامة."""
-    return user_has_role(user, 'preparer') or is_stage_supervisor(user)
+    """السماح للمحضّر بالدخول لصفحات متابعة/تحضير الحضور العامة."""
+    return user_has_role(user, 'preparer')
 
 
 ARABIC_WEEKDAY_NAMES = {
@@ -2167,6 +2167,61 @@ def is_admin(user):
 def admin_dashboard(request):
     # كود لوحة التحكم الشاملة
     return render(request, 'admin_view.html')
+
+
+@login_required
+@user_passes_test(is_admin)
+def export_student_data(request):
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'بيانات الطلاب'
+    worksheet.sheet_view.rightToLeft = True
+
+    headers = [
+        'اسم الطالب',
+        'جوال الطالب',
+        'جوال ولي الأمر',
+        'رقم الهوية الوطنية',
+        'الصف الدراسي',
+        'آخر جزء تم اختباره',
+        'التحفيظ السابق',
+        'الحي',
+        'المعلم المسؤول',
+        'الحالة',
+        'المرحلة التعليمية',
+    ]
+    students = Student.objects.select_related('teacher').order_by('full_name', 'id')
+    rows = [headers]
+    for student in students:
+        teacher_name = ''
+        if student.teacher:
+            teacher_name = student.teacher.get_full_name() or student.teacher.username
+        rows.append([
+            student.full_name,
+            student.student_phone,
+            student.parent_phone,
+            student.identity_number,
+            student.get_grade_display(),
+            student.get_last_tested_part_display(),
+            student.previous_center,
+            student.neighborhood,
+            teacher_name,
+            student.get_status_display(),
+            student.educational_stage,
+        ])
+
+    for row_number, row in enumerate(rows, start=1):
+        for column_number, value in enumerate(row, start=1):
+            cell = worksheet.cell(row=row_number, column=column_number)
+            cell.value = '' if value is None else str(value)
+            cell.data_type = 's'
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="student_data.xlsx"'
+    workbook.save(response)
+    return response
 
 @login_required
 @user_passes_test(is_admin)

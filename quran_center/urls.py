@@ -32,6 +32,7 @@ urlpatterns = [
     path('memorization-templates/active-bundle/', views.active_memorization_bundle_api, name='active_memorization_bundle_api'),
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('admin-statistics/', views.admin_statistics, name='admin_statistics'),
+    path('admin-dashboard/export-students/', views.export_student_data, name='export_student_data'),
     path('login/', views.TeacherLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='welcome'), name='logout'),
 ]
