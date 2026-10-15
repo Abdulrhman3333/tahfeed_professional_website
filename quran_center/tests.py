@@ -88,6 +88,7 @@ class StudentDataExportTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login/', response['Location'])
+<<<<<<< HEAD
 =======
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
@@ -466,3 +467,29 @@ class AdminPagesTest(TestCase):
         names = [t['name'] for t in data['teachers']]
         self.assertIn('أ. اختبار', names)
 >>>>>>> f212ca62147e61e58b9c37514b9328ce33da2624
+=======
+
+
+class PreparerAttendanceAccessTests(TestCase):
+    def setUp(self):
+        self.supervisor = User.objects.create_user(username='supervisor', password='password')
+        self.preparer = User.objects.create_user(username='preparer', password='password')
+        supervisor_role = Role.objects.create(code='supervisor', name='المشرف')
+        preparer_role = Role.objects.create(code='preparer', name='المحضّر')
+        UserRole.objects.create(user=self.supervisor, role=supervisor_role)
+        UserRole.objects.create(user=self.preparer, role=preparer_role)
+
+    def test_supervisor_without_preparer_role_is_denied(self):
+        self.client.force_login(self.supervisor)
+
+        response = self.client.get('/preparer-attendance/')
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_preparer_can_view_attendance_summary(self):
+        self.client.force_login(self.preparer)
+
+        response = self.client.get('/preparer-attendance/')
+
+        self.assertEqual(response.status_code, 200)
+>>>>>>> 8ffbdcd92bb86dbaed810380cacbadec15355685

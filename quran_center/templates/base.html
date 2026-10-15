@@ -48,11 +48,49 @@
     <div class="mobile-sidebar-body">
         {% if user.is_authenticated %}
             <div class="mobile-user">مرحباً، {{ user.username }}</div>
+<<<<<<< HEAD
             <a href="{% url 'attendance_page' %}" class="mobile-nav-link">تحضير الطلاب</a>
             <a href="{% url 'teacher_attendance_page' %}" class="mobile-nav-link">تحضير المعلمين</a>
             <a href="{% url 'student_status_page' %}" class="mobile-nav-link">حالة الطلاب</a>
             <a href="{% url 'teacher_status_page' %}" class="mobile-nav-link">حالة المعلمين</a>
             <a href="{% url 'add_student' %}" class="mobile-nav-link">إضافة طالب</a>
+=======
+
+            {% if user.stage_supervisor or user.is_superuser or user|has_role:"supervisor" %}
+            <!-- <a href="{% url 'home' %}" class="mobile-nav-link">تسجيل طالب</a> -->
+            <a href="{% url 'pending_students' %}" class="mobile-nav-link">الطلاب المنتظرين</a>
+            <a href="{% url 'stage_students_data' %}" class="mobile-nav-link">بيانات طلاب المرحلة</a>
+            {% endif %}
+
+            {% if not user.is_superuser and not user|has_role:"manager" %}
+            <a href="{% url 'teacher_dashboard' %}" class="mobile-nav-link">احصائية الغياب</a>
+            <a href="{% url 'teacher_students_data' %}" class="mobile-nav-link">بيانات الطلاب</a>
+            <a href="{% url 'take_attendance' %}" class="mobile-nav-link">التحضير</a>
+            <a href="{% url 'nominate_exam' %}" class="mobile-nav-link">ترشيح الاختبار</a>
+            {% endif %}
+
+            {% if user|has_role:"examiner" %}
+            <a href="{% url 'nominated_students' %}" class="mobile-nav-link">قائمة المرشحين</a>
+            <a href="{% url 'association_candidates' %}" class="mobile-nav-link">مرشحو الجمعية</a>
+            <a href="{% url 'association_results' %}" class="mobile-nav-link">نتائج الجمعية</a>
+            {% endif %}
+
+            {% if user|has_role:"manager" %}
+            <a href="{% url 'association_results' %}" class="mobile-nav-link">نتائج الجمعية</a>
+            {% endif %}
+
+            {% if user|has_role:"preparer" %}
+            <a href="{% url 'preparer_take_attendance' %}" class="mobile-nav-link">تحضير المعلمين</a>
+            <a href="{% url 'preparer_take_students_attendance' %}" class="mobile-nav-link">تحضير جميع الطلاب</a>
+            <a href="{% url 'preparer_attendance_summary' %}" class="mobile-nav-link">متابعة التحضير</a>
+            {% if user|has_role:"preparer" %}
+            <a href="{% url 'preparer_absent_contacts' %}" class="mobile-nav-link">أرقام الغياب</a>
+            {% endif %}
+            {% endif %}
+
+            {% if user.is_superuser or user|has_role:"manager" %}
+            <a href="{% url 'bulk_students_upload' %}" class="mobile-nav-link">رفع طلاب Excel</a>
+>>>>>>> 8ffbdcd92bb86dbaed810380cacbadec15355685
             {% if user.is_superuser %}
             <a href="{% url 'admin_statistics' %}" class="mobile-nav-link">إحصائيات الحضور</a>
             <a href="{% url 'add_teacher' %}" class="mobile-nav-link">إضافة معلم</a>
@@ -89,11 +127,54 @@
         <div>
             {% if user.is_authenticated %}
                 <span class="text-white me-3">مرحباً، {{ user.username }}</span>
+<<<<<<< HEAD
                 <a href="{% url 'attendance_page' %}" class="btn btn-outline-light btn-sm me-2">تحضير الطلاب</a>
                 <a href="{% url 'teacher_attendance_page' %}" class="btn btn-outline-light btn-sm me-2">تحضير المعلمين</a>
                 <a href="{% url 'student_status_page' %}" class="btn btn-outline-info btn-sm me-2">حالة الطلاب</a>
                 <a href="{% url 'teacher_status_page' %}" class="btn btn-outline-info btn-sm me-2">حالة المعلمين</a>
                 <a href="{% url 'add_student' %}" class="btn btn-outline-info btn-sm me-2">إضافة طالب</a>
+=======
+                
+                <!-- روابط المشرف والمدير -->
+                {% if user.stage_supervisor or user.is_superuser or user|has_role:"supervisor" %}
+                <!-- <a href="{% url 'home' %}" class="btn btn-outline-success btn-sm me-2">تسجيل طالب</a> -->
+                <a href="{% url 'pending_students' %}" class="btn btn-outline-warning btn-sm me-2">الطلاب المنتظرين</a>
+                <a href="{% url 'stage_students_data' %}" class="btn btn-outline-warning btn-sm me-2">بيانات طلاب المرحلة</a>
+                {% endif %}
+                
+                <!-- روابط المعلم (مخفية للمديرين) -->
+                {% if not user.is_superuser and not user|has_role:"manager" %}
+                <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-info btn-sm me-2">احصائية الغياب</a>
+                <a href="{% url 'teacher_students_data' %}" class="btn btn-outline-info btn-sm me-2">بيانات الطلاب</a>
+                <a href="{% url 'take_attendance' %}" class="btn btn-outline-light btn-sm me-2">التحضير</a>
+                <a href="{% url 'nominate_exam' %}" class="btn btn-outline-primary btn-sm me-2">ترشيح الاختبار</a>
+                {% endif %}
+
+                <!-- روابط المختبر -->
+                {% if user|has_role:"examiner" %}
+                <a href="{% url 'nominated_students' %}" class="btn btn-outline-secondary btn-sm me-2">قائمة المرشحين</a>
+                <a href="{% url 'association_candidates' %}" class="btn btn-outline-secondary btn-sm me-2">مرشحو الجمعية</a>
+                <a href="{% url 'association_results' %}" class="btn btn-outline-secondary btn-sm me-2">نتائج الجمعية</a>
+                {% endif %}
+
+                {% if user|has_role:"manager" %}
+                <a href="{% url 'association_results' %}" class="btn btn-outline-secondary btn-sm me-2">نتائج الجمعية</a>
+                {% endif %}
+
+                <!-- روابط المحضّر -->
+                {% if user|has_role:"preparer" %}
+                <a href="{% url 'preparer_take_attendance' %}" class="btn btn-outline-success btn-sm me-2">تحضير المعلمين</a>
+                <a href="{% url 'preparer_take_students_attendance' %}" class="btn btn-outline-success btn-sm me-2">تحضير جميع الطلاب</a>
+                <a href="{% url 'preparer_attendance_summary' %}" class="btn btn-outline-success btn-sm me-2">متابعة التحضير</a>
+                {% if user|has_role:"preparer" %}
+                <a href="{% url 'preparer_absent_contacts' %}" class="btn btn-outline-success btn-sm me-2">أرقام الغياب</a>
+                {% endif %}
+                {% endif %}
+                
+                <!-- روابط المدير -->
+                {% if user.is_superuser or user|has_role:"manager" %}
+                <a href="{% url 'bulk_students_upload' %}" class="btn btn-outline-warning btn-sm me-2">رفع طلاب Excel</a>
+>>>>>>> 8ffbdcd92bb86dbaed810380cacbadec15355685
                 {% if user.is_superuser %}
                 <a href="{% url 'admin_statistics' %}" class="btn btn-outline-success btn-sm me-2">إحصائيات</a>
                 <a href="{% url 'add_teacher' %}" class="btn btn-outline-success btn-sm me-2">إضافة معلم</a>

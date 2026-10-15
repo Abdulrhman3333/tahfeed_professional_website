@@ -745,7 +745,7 @@ def pending_students(request):
     # التحقق من الصلاحيات
     if not is_stage_supervisor(request.user):
         return redirect('home')
-    
+
     # جلب الطلاب حسب مرحلة المشرف
     if request.user.is_superuser:
         # المدير يرى جميع الطلاب
@@ -759,12 +759,12 @@ def pending_students(request):
         students = Student.objects.filter(status='منتظر').order_by('full_name')
     else:
         students = Student.objects.none()
-    
+
     # جلب جميع المعلمين لقائمة التعيين (المعلمين الحاليين + الموظفين)
     teachers = User.objects.filter(
         Q(student__isnull=False) | Q(is_staff=True)
     ).distinct().order_by('username')
-    
+
     if request.method == 'POST':
         parent_phone = request.POST.get('parent_phone', '').strip()
         if not parent_phone:
@@ -1311,6 +1311,11 @@ def save_teacher_period(request):
     """AJAX endpoint: save a single period's status for one teacher/date."""
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST only'})
+=======
+def preparer_take_students_attendance(request):
+    """تحضير طلاب أي معلم - للمحضّر فقط"""
+    if not can_access_preparer_attendance(request.user):
+        return redirect('home')
 
     teacher_id = request.POST.get('teacher_id')
     date_str = request.POST.get('date')
@@ -1717,7 +1722,7 @@ def export_student_data(request):
 def admin_statistics(request):
     """صفحة الإحصائيات الشاملة للمدير"""
     from django.db.models import Count, Q
-    
+
     # الحصول على جميع المراحل الموجودة
     STAGES = [
         ('مبكرة', 'مبكرة'),
@@ -1726,16 +1731,16 @@ def admin_statistics(request):
         ('ثانوي', 'ثانوي'),
         ('جامعي', 'جامعي'),
     ]
-    
+
     # إحصائيات عامة
     total_students = Student.objects.filter(status='منتظم').count()
     total_tested = ExamNomination.objects.filter(internal_passed=True).count()
-    
+
     # إجمالي الغياب اليومي
     today = timezone.now().date()
     total_absent_today = Attendance.objects.filter(date=today, status='غائب').count()
     total_teacher_absent_today = TeacherAttendance.objects.filter(date=today, status='غائب').count()
-    
+
     # إحصائيات حسب المرحلة
     stage_stats = []
     for stage_code, stage_name in STAGES:
@@ -1744,14 +1749,14 @@ def admin_statistics(request):
             student__educational_stage=stage_code,
             internal_passed=True
         ).count()
-        
+
         # الغياب اليومي في هذه المرحلة
         stage_absent_today = Attendance.objects.filter(
             student__educational_stage=stage_code,
             date=today,
             status='غائب'
         ).count()
-        
+
         if stage_students.count() > 0:
             stage_stats.append({
                 'stage': stage_name,
@@ -1759,12 +1764,12 @@ def admin_statistics(request):
                 'tested': stage_tested,
                 'absent_today': stage_absent_today,
             })
-    
+
     # إحصائيات حسب المعلم
     teachers = User.objects.filter(
         student__status='منتظم'
     ).distinct().order_by('username')
-    
+
     teacher_stats = []
     for teacher in teachers:
         teacher_students = Student.objects.filter(teacher=teacher, status='منتظم')
@@ -1772,7 +1777,7 @@ def admin_statistics(request):
             teacher=teacher,
             internal_passed=True
         ).count()
-        
+
         # الغياب اليومي عند هذا المعلم
         teacher_absent_today = Attendance.objects.filter(
             student__teacher=teacher,
@@ -1786,7 +1791,7 @@ def admin_statistics(request):
             date=today,
             status='غائب'
         ).count()
-        
+
         # إحصائيات المعلم حسب المرحلة
         teacher_stage_stats = []
         for stage_code, stage_name in STAGES:
@@ -1797,21 +1802,21 @@ def admin_statistics(request):
                     student__educational_stage=stage_code,
                     internal_passed=True
                 ).count()
-                
+
                 stage_absent = Attendance.objects.filter(
                     student__teacher=teacher,
                     student__educational_stage=stage_code,
                     date=today,
                     status='غائب'
                 ).count()
-                
+
                 teacher_stage_stats.append({
                     'stage': stage_name,
                     'total_students': stage_students.count(),
                     'tested': stage_tested,
                     'absent_today': stage_absent,
                 })
-        
+
         teacher_stats.append({
             'teacher': teacher.username,
             'total_students': teacher_students.count(),
@@ -1820,7 +1825,7 @@ def admin_statistics(request):
             'teacher_self_absent_today': teacher_self_absent_today,
             'stage_stats': teacher_stage_stats,
         })
-    
+
     context = {
         'total_students': total_students,
         'total_tested': total_tested,
@@ -1830,7 +1835,7 @@ def admin_statistics(request):
         'stage_stats': stage_stats,
         'teacher_stats': teacher_stats,
     }
-    
+
     return render(request, 'admin_statistics.html', context)
 
 # 2. للمعلمين: أي مستخدم مسجل دخول (معلم أو مدير)
