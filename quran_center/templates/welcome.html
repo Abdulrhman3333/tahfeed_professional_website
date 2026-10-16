@@ -1,210 +1,90 @@
 {% extends "base.html" %}
 {% load static %}
-
-{% block title %}واعد ٤ — برنامج صيفي ملهم{% endblock %}
+{% block title %}حلقات جامع الحمودي - الصفحة الرئيسية{% endblock %}
 
 {% block content %}
+<!-- Hero Section -->
+<div class="hero-section">
+    <div class="hero-content">
+        <img src="{% static 'images/logo.jpg' %}" alt="شعار جامع الحمودي" class="logo-circle" style="object-fit: contain;">
+        
+        <h1 style="font-size: 3rem; font-weight: 700; margin: 0 0 0.5rem 0; letter-spacing: 1px;">حلقات جامع الحمودي</h1>
+        <p style="font-size: 1.3rem; margin: 0.5rem 0 1rem 0; opacity: 0.95; font-weight: 500;">مركز تحفيظ القرآن الكريم</p>
+        <p style="font-size: 1rem; margin: 1rem 0 0 0; opacity: 0.85; max-width: 600px; margin-left: auto; margin-right: auto;">نافذتك نحو حفظ كتاب الله وتعلم تجويده في بيئة إسلامية احترافية</p>
+    </div>
+</div>
 
-<!--
-  واعد ٤ landing page — summer camp promotional page.
-  Registration URL is passed from welcome_view as `registration_url`
-  so it's defined in one place — update it in views.py for future camps.
--->
+<!-- Features Section -->
+<div class="row mb-5">
+    <div class="col-md-4 mb-3">
+        <div class="feature-card">
+            <div class="feature-icon">📚</div>
+            <h5>برنامج تعليمي متقدم</h5>
+            <p class="text-muted">منهج شامل لتحفيظ القرآن الكريم مع التركيز على التجويد والمتابعة المستمرة.</p>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="feature-card">
+            <div class="feature-icon">👨‍🏫</div>
+            <h5>معلمون متخصصون</h5>
+            <p class="text-muted">فريق من المعلمين المؤهلين والملتزمين بجودة التعليم والتدريب.</p>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h5>متابعة دورية</h5>
+            <p class="text-muted">نظام متقدم لتتبع تقدم الطلاب والاختبارات الدورية والتقييم الشامل.</p>
+        </div>
+    </div>
+</div>
 
-<!-- ===== 1. HERO SECTION ===== -->
-<div class="waed-hero">
-    <!-- Decorative SVG palm leaves (top-left, cropped at edge) -->
-    <svg class="waed-palm-left" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M-20,0 C30,40 60,100 40,180 C20,140 0,100 -10,60 Z" fill="#1a6b3c" opacity="0.35"/>
-        <path d="M-10,20 C50,60 80,130 50,220 C30,170 10,120 -5,80 Z" fill="#22874a" opacity="0.25"/>
-        <path d="M0,10 C60,30 100,80 80,160 C50,120 20,80 5,40 Z" fill="#2d9d6f" opacity="0.2"/>
+<!-- Call to Action -->
+<div class="cta-section">
+    <h2 style="color: #5B8FBE; font-size: 2rem; margin-bottom: 1rem; font-weight: 700;">ابدأ رحلتك معنا اليوم</h2>
+    <div style="height: 3px; background: linear-gradient(90deg, transparent, #8B5A3C, transparent); margin-bottom: 1.5rem; border-radius: 2px;"></div>
+    <p style="color: #6b7280; font-size: 1.05rem; margin-bottom: 1.5rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+        سجل الآن واكتشف كيف يمكننا مساعدتك في رحلتك نحو حفظ كتاب الله
+    </p>
+    <div>
+        <a href="{% url 'login' %}" class="btn-login">دخول المعلمين</a>
+        <a href="{% url 'home' %}" class="btn-register">تسجيل طالب جديد</a>
+        <a href="{% url 'parent_inquiry' %}" class="btn-inquiry">الاستعلام عن حالة الأبناء</a>
+    </div>
+</div>
+
+<!-- Info Cards -->
+<div class="row mt-5">
+    <div class="col-lg-6 mb-4">
+        <div class="card" style="border-right: 5px solid #5B8FBE; border-bottom: 3px solid #8B5A3C;">
+            <div class="card-body">
+                <h5 style="color: #5B8FBE; font-weight: 700; margin-bottom: 1rem;">رؤيتنا</h5>
+                <div style="height: 2px; background: linear-gradient(90deg, transparent, #8B5A3C, transparent); margin-bottom: 1rem;"></div>
+                <p style="color: #6b7280; line-height: 1.8;">
+                    إنشاء جيل قرآني متمكن من كتاب الله تعالى، متقن لتجويده، مطبق لأحكامه في حياته، بروح إسلامية عالية.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card" style="border-right: 5px solid #5B8FBE; border-bottom: 3px solid #8B5A3C;">
+            <div class="card-body">
+                <h5 style="color: #5B8FBE; font-weight: 700; margin-bottom: 1rem;">رسالتنا</h5>
+                <div style="height: 2px; background: linear-gradient(90deg, transparent, #8B5A3C, transparent); margin-bottom: 1rem;"></div>
+                <p style="color: #6b7280; line-height: 1.8;">
+                    توفير بيئة تعليمية احترافية لتحفيظ القرآن الكريم وتجويده، مع متابعة مستمرة وتقييم دوري لضمان تحقيق الأهداف المطلوبة.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WhatsApp Chat Button -->
+<a href="https://wa.me/966539274185?text=السلام عليكم ورحمة الله وبركاته" target="_blank" rel="noopener noreferrer" class="whatsapp-btn" title="تواصل معنا على واتس آب">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.272-.099-.47-.148-.67.15-.23.297-.921 1.165-.929 1.253-.009.088-.047.169-.147.169h-.915c-.099 0-.393-.074-.757-.386-1.314-1.164-2.046-2.798-2.289-4.953-.096-.66-.045-1.193.182-1.537.168-.25.591-.064.591-.064l.992.161c.1.018.171.089.188.177.57 2.782 2.917 5.138 5.765 5.738.122.034.206.131.216.247l.5.953c.025.488-.212.773-.358.773-.592 0-3.487-1.286-4.183-4.391-.471-2.16.432-4.376 2.322-5.396 1.974-1.14 4.827-.555 6.166 1.222 1.34 1.777.545 4.256-1.765 5.385z" fill="currentColor"/>
+        <path d="M12 0C5.373 0 0 5.373 0 12c0 2.302.627 4.562 1.815 6.5l-1.705 5.973L7.852 21.82C9.715 22.866 11.78 23.5 12 23.5c6.627 0 12-5.373 12-12S18.627 0 12 0zm.001 21.5c-.22 0-2.08-.634-3.792-1.603l-3.029.887.927-3.235C1.873 16.152 1.5 14.152 1.5 12c0-5.799 4.701-10.5 10.5-10.5s10.5 4.701 10.5 10.5-4.701 10.5-10.5 10.5z" fill="currentColor"/>
     </svg>
-    <!-- Decorative SVG palm leaves (top-right, cropped at edge) -->
-    <svg class="waed-palm-right" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M220,0 C170,40 140,100 160,180 C180,140 200,100 210,60 Z" fill="#1a6b3c" opacity="0.35"/>
-        <path d="M210,20 C150,60 120,130 150,220 C170,170 190,120 205,80 Z" fill="#22874a" opacity="0.25"/>
-        <path d="M200,10 C140,30 100,80 120,160 C150,120 180,80 195,40 Z" fill="#2d9d6f" opacity="0.2"/>
-    </svg>
-    <!-- Decorative mountain silhouette (right side) -->
-    <svg class="waed-mountain" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M300,200 L200,80 L150,130 L100,60 L50,140 L0,200 Z" fill="#1b3a5c" opacity="0.08"/>
-        <path d="M300,200 L220,100 L170,150 L120,90 L70,160 L20,200 Z" fill="#1b3a5c" opacity="0.05"/>
-    </svg>
-    <!-- Decorative wave splash (left side) -->
-    <svg class="waed-wave-left" viewBox="0 0 100 400" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M0,0 C30,50 10,100 40,150 C10,200 30,250 0,300 Z" fill="white" opacity="0.08"/>
-        <path d="M0,20 C20,70 5,120 30,170 C5,220 20,270 0,320 Z" fill="#bfe8f7" opacity="0.06"/>
-    </svg>
-
-    <img src="{% static 'images/waed4_logo.jpeg' %}" alt="واعد ٤" class="waed-hero-logo"
-         onerror="this.style.display='none'; this.nextElementSibling.style.display='';">
-    <h1 style="display:none; font-size:2.5rem; font-weight:700; margin:0 0 1rem;">واعد ٤</h1>
-
-    <p class="waed-tagline">برنامج صيفي ملهم</p>
-    <p class="waed-tagline-sub">لصناعة <span class="waed-highlight-pill">مستقبل</span> واعد</p>
-
-    <a href="{{ registration_url }}" target="_blank" rel="noopener noreferrer" class="waed-register-btn">
-        <i class="bi bi-pencil-fill"></i> سجل الآن
-    </a>
-</div>
-
-<!-- ===== 2. PROGRAM ACTIVITIES ===== -->
-<div class="waed-section">
-    <div class="waed-section-header">من برامجنا</div>
-    <div class="row g-3">
-        <div class="col-md-6 col-lg-4">
-            <div class="waed-activity-card">
-                <div class="activity-icon"><i class="bi bi-geo-alt-fill"></i></div>
-                <div class="activity-label">ربوع بلادي</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="waed-activity-card">
-                <div class="activity-icon"><i class="bi bi-mic-fill"></i></div>
-                <div class="activity-label">لقاءات مهارية</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="waed-activity-card">
-                <div class="activity-icon"><i class="bi bi-trophy-fill"></i></div>
-                <div class="activity-label">أنشطة رياضية</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="waed-activity-card">
-                <div class="activity-icon"><i class="bi bi-gift-fill"></i></div>
-                <div class="activity-label">هدايا مميزة</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="waed-activity-card">
-                <div class="activity-icon"><i class="bi bi-bullseye"></i></div>
-                <div class="activity-label">تحديات ممتعة</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="waed-activity-card">
-                <div class="activity-icon"><i class="bi bi-book-fill"></i></div>
-                <div class="activity-label">مسابقات ثقافية</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="waed-activity-card">
-                <div class="activity-icon"><i class="bi bi-stars"></i></div>
-                <div class="activity-label">مفاجآت متنوعة</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="waed-activity-card">
-                <div class="activity-icon"><i class="bi bi-people-fill"></i></div>
-                <div class="activity-label">أنشطة اجتماعية</div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-4">
-            <div class="waed-activity-card">
-                <div class="activity-icon"><i class="bi bi-mortarboard-fill"></i></div>
-                <div class="activity-label">دورات تدريبية</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ===== 3. PROGRAM FEATURES ===== -->
-<div class="waed-section">
-    <div class="waed-section-header">مميزات البرنامج</div>
-    <div class="row g-3">
-        <div class="col-6 col-md-3">
-            <div class="waed-feature-item">
-                <div class="feature-badge feature-badge-blue"><i class="bi bi-person-badge-fill"></i></div>
-                <div class="feature-label">كادر تربوي</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="waed-feature-item">
-                <div class="feature-badge feature-badge-orange"><i class="bi bi-eye-fill"></i></div>
-                <div class="feature-label">متابعة مستمرة</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="waed-feature-item">
-                <div class="feature-badge feature-badge-green"><i class="bi bi-shield-fill-check"></i></div>
-                <div class="feature-label">بيئة آمنة</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="waed-feature-item">
-                <div class="feature-badge feature-badge-purple"><i class="bi bi-lightbulb-fill"></i></div>
-                <div class="feature-label">برامج ملهمة</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ===== 4. KEY DATES + FEES (3 info cards) ===== -->
-<div class="waed-section">
-    <div class="row g-3">
-        <div class="col-lg-4">
-            <div class="waed-info-card waed-info-orange">
-                <div class="info-card-icon"><i class="bi bi-pencil-square"></i></div>
-                <div class="info-card-title">بداية التسجيل</div>
-                <div class="info-card-value">
-                    من <strong>10/1</strong> إلى <strong>15/1</strong>
-                </div>
-                <div class="info-card-sub">1448هـ · أو حتى اكتمال العدد</div>
-            </div>
-        </div>
-        <div class="col-lg-4">
-            <div class="waed-info-card waed-info-blue">
-                <div class="info-card-icon"><i class="bi bi-calendar-event"></i></div>
-                <div class="info-card-title">بداية البرنامج</div>
-                <div class="info-card-value">
-                    من <strong>27/1</strong> إلى <strong>23/2</strong>
-                </div>
-                <div class="info-card-sub">1448هـ · + الرحلة الختامية</div>
-            </div>
-        </div>
-        <div class="col-lg-4">
-            <div class="waed-info-card waed-info-green">
-                <div class="info-card-icon"><i class="bi bi-coin"></i></div>
-                <div class="info-card-title">رسوم الاستثمار</div>
-                <div class="info-card-value">
-                    500 — 550 — 600 <span class="info-currency">ريال</span>
-                </div>
-                <div class="info-card-sub">أو أكثر · لجميع المراحل</div>
-                <div class="info-card-disclaimer">
-                    الرسوم لا تشمل البرنامج الختامي + الرحلات والبرامج الكبيرة
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ===== 5. IMPORTANT NOTICE ===== -->
-<div class="waed-notice">
-    <div class="notice-icon"><i class="bi bi-bell-fill"></i></div>
-    <div class="notice-body">
-        <div class="notice-heading">تنبيه مهم</div>
-        <div class="notice-text">
-            التسجيل لا يُعد مؤكدًا إلا بعد تواصل إدارة البرنامج معكم وإضافتكم لمجموعة البرنامج.
-        </div>
-    </div>
-</div>
-
-<!-- ===== 6. FINAL CTA + UTILITY LINKS ===== -->
-<div class="waed-final-cta">
-    <a href="{{ registration_url }}" target="_blank" rel="noopener noreferrer" class="waed-register-btn">
-        <i class="bi bi-pencil-fill"></i> سجل الآن
-    </a>
-
-    <div class="waed-staff-links">
-        <p>هل أنت من طاقم العمل؟</p>
-        <a href="{% url 'login' %}" class="waed-staff-link">
-            <i class="bi bi-box-arrow-in-right"></i> تسجيل الدخول
-        </a>
-        <a href="{% url 'parent_inquiry' %}" class="waed-staff-link">
-            <i class="bi bi-search"></i> الاستعلام عن حالة الأبناء
-        </a>
-    </div>
-</div>
+</a>
 
 {% endblock %}

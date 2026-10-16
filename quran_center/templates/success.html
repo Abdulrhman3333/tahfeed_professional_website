@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}تم التسجيل بنجاح{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">تم التسجيل بنجاح</h1>
+        <p class="page-hero-subtitle">تم استلام طلبك وسيتم التواصل معك قريباً</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+    <div class="card shadow text-center">
+        <div class="card-header bg-success text-white">
+            <h3>✅ تم التسجيل بنجاح!</h3>
+        </div>
+        <div class="card-body">
+            <p class="lead">تم استقبال طلب تسجيلك بنجاح.</p>
+            <p>سيتم مراجعة طلبك من قبل المسؤولين وسيتم التواصل معك قريباً.</p>
+            <p class="text-muted">شكراً لتسجيلك في حلقات القرآن الكريم.</p>
+            <a href="{% url 'home' %}" class="btn btn-primary mt-3">العودة للصفحة الرئيسية</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

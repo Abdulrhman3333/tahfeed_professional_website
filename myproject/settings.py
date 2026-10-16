@@ -57,6 +57,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# Allow same-origin iframes (used by student plan generator page).
+X_FRAME_OPTIONS = "SAMEORIGIN"
+
 ROOT_URLCONF = "myproject.urls"
 
 TEMPLATES = [
@@ -135,12 +138,33 @@ STATICFILES_DIRS = [
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Login/Logout redirects
-LOGIN_REDIRECT_URL = 'attendance_page'
-LOGOUT_REDIRECT_URL = 'welcome'
+LOGIN_REDIRECT_URL = 'take_attendance'
+LOGOUT_REDIRECT_URL = 'home'
 LOGIN_URL = 'login'
 
 # Persistent sessions: keep users logged in across browser restarts.
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 90  # 90 days
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SAVE_EVERY_REQUEST = True
+
+# SMS API configuration (set these in environment variables on the server).
+SMS_API_URL = os.getenv('SMS_API_URL', 'https://api.oursms.com/msgs/sms')
+SMS_API_KEY = os.getenv('SMS_API_KEY', '')
+SMS_SENDER_ID = os.getenv('SMS_SENDER_ID', '')
+SMS_API_TIMEOUT = int(os.getenv('SMS_API_TIMEOUT', '15'))
+SMS_AUTH_HEADER = os.getenv('SMS_AUTH_HEADER', 'Authorization')
+SMS_AUTH_SCHEME = os.getenv('SMS_AUTH_SCHEME', 'Bearer')
+SMS_PHONE_FIELD = os.getenv('SMS_PHONE_FIELD', 'dests')
+SMS_MESSAGE_FIELD = os.getenv('SMS_MESSAGE_FIELD', 'body')
+SMS_SENDER_FIELD = os.getenv('SMS_SENDER_FIELD', 'src')
+SMS_PHONE_IS_ARRAY = os.getenv('SMS_PHONE_IS_ARRAY', 'True').lower() == 'true'
+
+# WhatsApp bot (whatsapp-web.js running on a Raspberry Pi inside the LAN).
+# Django POSTs the batch to {WHATSAPP_BOT_URL}/send with header X-Bot-Token: {WHATSAPP_BOT_TOKEN}.
+WHATSAPP_BOT_URL = os.getenv('WHATSAPP_BOT_URL', '')
+WHATSAPP_BOT_TOKEN = os.getenv('WHATSAPP_BOT_TOKEN', '')
+WHATSAPP_BOT_TIMEOUT = int(os.getenv('WHATSAPP_BOT_TIMEOUT', '600'))
+WHATSAPP_ADMIN_NUMBER = os.getenv('WHATSAPP_ADMIN_NUMBER', '966538914185')
+WHATSAPP_MIN_DELAY_MS = int(os.getenv('WHATSAPP_MIN_DELAY_MS', '4000'))
+WHATSAPP_MAX_DELAY_MS = int(os.getenv('WHATSAPP_MAX_DELAY_MS', '12000'))
 

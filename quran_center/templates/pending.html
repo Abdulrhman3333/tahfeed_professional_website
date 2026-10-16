@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-hero">
+    <div class="page-hero-inner">
+        <h1 class="page-hero-title">الطلاب المنتظرون</h1>
+        <p class="page-hero-subtitle">مراجعة الطلبات وتعيين المعلمين</p>
+    </div>
+</div>
+
+<div class="container" dir="rtl">
+    
+    <!-- Desktop Table View -->
+    <div class="table-responsive d-none d-md-block">
+        <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>اسم الطالب</th>
+                    <th>الصف</th>
+                    <th>آخر جزء مختبر</th>
+                    <th>جوال ولي الأمر</th>
+                    <th>جوال الطالب</th>
+                    <th>تعيين المعلم</th>
+                    <th>الإجراء</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.full_name }}</td>
+                    <td>{{ student.get_grade_display }}</td>
+                    <td>{{ student.get_last_tested_part_display }}</td>
+                    <td>{{ student.parent_phone|default:"-" }}</td>
+                    <td>{{ student.student_phone|default:"-" }}</td>
+                    <td>
+                        <form method="post" style="display:inline;" id="form_{{ student.id }}">
+                            {% csrf_token %}
+                            <input type="hidden" name="student_id" value="{{ student.id }}">
+                            <select name="teacher_id" class="form-select form-select-sm" style="width: 100%;">
+                                <option value="">-- اختر المعلم --</option>
+                                {% for teacher in teachers %}
+                                <option value="{{ teacher.id }}">{{ teacher.username }}</option>
+                                {% endfor %}
+                            </select>
+                    </td>
+                    <td>
+                            <button type="submit" class="btn btn-success btn-sm">قبول وتعيين</button>
+                        </form>
+                        <form method="post" action="{% url 'delete_pending_student' student.id %}" onsubmit="return confirm('هل تريد حذف هذا الطالب من قائمة الانتظار؟');" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger btn-sm">حذف</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center">لا يوجد طلاب في قائمة الانتظار حالياً.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Mobile Card View -->
+    <div class="d-md-none">
+        {% for student in students %}
+        <div class="card mb-3 mobile-student-card">
+            <div class="card-body">
+                <h6 class="card-title text-primary fw-bold mb-3">{{ student.full_name }}</h6>
+                
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <small class="text-muted d-block">الصف</small>
+                        <strong>{{ student.get_grade_display }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">آخر جزء مختبر</small>
+                        <strong>{{ student.get_last_tested_part_display }}</strong>
+                    </div>
+                </div>
+
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <small class="text-muted d-block">جوال ولي الأمر</small>
+                        <strong class="text-success">{{ student.parent_phone|default:"-" }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">جوال الطالب</small>
+                        <strong class="text-success">{{ student.student_phone|default:"-" }}</strong>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small text-muted">تعيين المعلم</label>
+                    <form method="post" id="form_mobile_{{ student.id }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="student_id" value="{{ student.id }}">
+                        <select name="teacher_id" class="form-select form-select-sm mb-2">
+                            <option value="">-- اختر المعلم --</option>
+                            {% for teacher in teachers %}
+                            <option value="{{ teacher.id }}">{{ teacher.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-success btn-sm w-100">قبول وتعيين</button>
+                    </form>
+                </div>
+
+                <form method="post" action="{% url 'delete_pending_student' student.id %}" onsubmit="return confirm('هل تريد حذف هذا الطالب من قائمة الانتظار؟');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">حذف من القائمة</button>
+                </form>
+            </div>
+        </div>
+        {% empty %}
+        <div class="alert alert-info text-center" role="alert">
+            لا يوجد طلاب في قائمة الانتظار حالياً.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+@media (max-width: 767px) {
+    .mobile-student-card {
+        border-left: 4px solid #5B8FBE;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .mobile-student-card .card-body {
+        padding: 1.2rem;
+    }
+}
+</style>
+{% endblock %}

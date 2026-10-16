@@ -10,8 +10,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" id="bootstrapCdnPrimary">
     <script>
         (function () {
+            // Some mobile networks block specific CDNs; load a fallback only if primary fails.
             var primary = document.getElementById('bootstrapCdnPrimary');
             if (!primary) return;
+
             primary.onerror = function () {
                 var fallback = document.createElement('link');
                 fallback.rel = 'stylesheet';
@@ -21,26 +23,23 @@
             };
         })();
     </script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <title>{% block title %}منصة الحضور{% endblock %}</title>
+    <title>{% block title %}حلقات جامع الحمودي{% endblock %}</title>
 </head>
 <body class="bg-light">
+
+{% load role_tags %}
 
 <div class="mobile-topbar">
     <button type="button" class="mobile-menu-btn" id="mobileMenuBtn" aria-controls="mobileSidebar" aria-expanded="false">
         ☰
     </button>
-    <span class="mobile-brand">
-        <img src="{% static 'images/waed4_logo.jpeg' %}" alt="واعد ٤" class="nav-logo-mobile-waed"
-             onerror="this.style.display='none'; this.nextElementSibling.style.display='';">
-        <span style="display:none;">منصة الحضور</span>
-    </span>
+    <span class="mobile-brand">حلقات جامع الحمودي</span>
 </div>
 
 <aside class="mobile-sidebar" id="mobileSidebar" aria-hidden="true">
     <div class="mobile-sidebar-header">
-        <span class="mobile-sidebar-title">منصة الحضور</span>
+        <span class="mobile-sidebar-title">حلقات جامع الحمودي</span>
         <button type="button" class="mobile-close-btn" id="mobileCloseBtn" aria-label="إغلاق القائمة">
             ×
         </button>
@@ -48,13 +47,6 @@
     <div class="mobile-sidebar-body">
         {% if user.is_authenticated %}
             <div class="mobile-user">مرحباً، {{ user.username }}</div>
-<<<<<<< HEAD
-            <a href="{% url 'attendance_page' %}" class="mobile-nav-link">تحضير الطلاب</a>
-            <a href="{% url 'teacher_attendance_page' %}" class="mobile-nav-link">تحضير المعلمين</a>
-            <a href="{% url 'student_status_page' %}" class="mobile-nav-link">حالة الطلاب</a>
-            <a href="{% url 'teacher_status_page' %}" class="mobile-nav-link">حالة المعلمين</a>
-            <a href="{% url 'add_student' %}" class="mobile-nav-link">إضافة طالب</a>
-=======
 
             {% if user.stage_supervisor or user.is_superuser or user|has_role:"supervisor" %}
             <!-- <a href="{% url 'home' %}" class="mobile-nav-link">تسجيل طالب</a> -->
@@ -90,50 +82,34 @@
 
             {% if user.is_superuser or user|has_role:"manager" %}
             <a href="{% url 'bulk_students_upload' %}" class="mobile-nav-link">رفع طلاب Excel</a>
->>>>>>> 8ffbdcd92bb86dbaed810380cacbadec15355685
             {% if user.is_superuser %}
-            <a href="{% url 'admin_statistics' %}" class="mobile-nav-link">إحصائيات الحضور</a>
-            <a href="{% url 'add_teacher' %}" class="mobile-nav-link">إضافة معلم</a>
-            <a href="{% url 'admin:index' %}" class="mobile-nav-link">لوحة الإدارة</a>
+            <a href="{% url 'superuser_template_upload' %}" class="mobile-nav-link">رفع قوالب الحفظ Excel</a>
             {% endif %}
+            <a href="{% url 'admin:index' %}" class="mobile-nav-link">لوحة الإدارة</a>
+            <a href="{% url 'admin_statistics' %}" class="mobile-nav-link">الإحصائيات</a>
+            {% endif %}
+
             <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}
                 <button type="submit" class="mobile-logout">تسجيل الخروج</button>
             </form>
         {% else %}
-            <a href="{% url 'welcome' %}" class="mobile-nav-link">الرئيسية</a>
-            <a href="{% url 'parent_inquiry' %}" class="mobile-nav-link">استعلام أولياء الأمور</a>
-            <a href="{% url 'login' %}" class="mobile-nav-link">تسجيل الدخول</a>
+            <a href="{% url 'welcome' %}" class="mobile-nav-link">الصفحة الرئيسية</a>
+            <a href="{% url 'login' %}" class="mobile-nav-link">دخول المعلمين</a>
+            <!-- <a href="{% url 'home' %}" class="mobile-nav-link">تسجيل طالب جديد</a> -->
+            <a href="{% url 'parent_inquiry' %}" class="mobile-nav-link">الاستعلام عن حالة الأبناء</a>
         {% endif %}
     </div>
 </aside>
 
 <div class="mobile-overlay" id="mobileOverlay" aria-hidden="true"></div>
 
-<!--
-  Navbar branding: replaced the old mosque-dome logo.jpg with the واعد ٤
-  wordmark (waed4_logo.jpeg) since this page now represents the camp's
-  public identity. The new logo is a wide horizontal lockup (not square),
-  so it's sized as a wordmark. The onerror fallback hides the broken image
-  and shows the text fallback if the JPEG is missing.
--->
 <nav class="navbar navbar-dark bg-dark mb-4">
     <div class="container">
-        <span class="navbar-brand d-flex align-items-center gap-2">
-            <img src="{% static 'images/waed4_logo.jpeg' %}" alt="واعد ٤" class="nav-logo-waed"
-                 onerror="this.style.display='none'; this.nextElementSibling.style.display='';">
-            <span style="display:none;">واعد ٤</span>
-        </span>
+        <span class="navbar-brand">حلقات جامع الحمودي</span>
         <div>
             {% if user.is_authenticated %}
                 <span class="text-white me-3">مرحباً، {{ user.username }}</span>
-<<<<<<< HEAD
-                <a href="{% url 'attendance_page' %}" class="btn btn-outline-light btn-sm me-2">تحضير الطلاب</a>
-                <a href="{% url 'teacher_attendance_page' %}" class="btn btn-outline-light btn-sm me-2">تحضير المعلمين</a>
-                <a href="{% url 'student_status_page' %}" class="btn btn-outline-info btn-sm me-2">حالة الطلاب</a>
-                <a href="{% url 'teacher_status_page' %}" class="btn btn-outline-info btn-sm me-2">حالة المعلمين</a>
-                <a href="{% url 'add_student' %}" class="btn btn-outline-info btn-sm me-2">إضافة طالب</a>
-=======
                 
                 <!-- روابط المشرف والمدير -->
                 {% if user.stage_supervisor or user.is_superuser or user|has_role:"supervisor" %}
@@ -174,20 +150,19 @@
                 <!-- روابط المدير -->
                 {% if user.is_superuser or user|has_role:"manager" %}
                 <a href="{% url 'bulk_students_upload' %}" class="btn btn-outline-warning btn-sm me-2">رفع طلاب Excel</a>
->>>>>>> 8ffbdcd92bb86dbaed810380cacbadec15355685
                 {% if user.is_superuser %}
-                <a href="{% url 'admin_statistics' %}" class="btn btn-outline-success btn-sm me-2">إحصائيات</a>
-                <a href="{% url 'add_teacher' %}" class="btn btn-outline-success btn-sm me-2">إضافة معلم</a>
-                <a href="{% url 'admin:index' %}" class="btn btn-outline-warning btn-sm me-2">لوحة الإدارة</a>
+                <a href="{% url 'superuser_template_upload' %}" class="btn btn-outline-warning btn-sm me-2">رفع قوالب الحفظ Excel</a>
                 {% endif %}
+                <a href="{% url 'admin:index' %}" class="btn btn-outline-warning btn-sm me-2">لوحة الإدارة</a>
+                <a href="{% url 'admin_statistics' %}" class="btn btn-outline-warning btn-sm me-2">الإحصائيات</a>
+                {% endif %}
+                
                 <form method="post" action="{% url 'logout' %}" style="display: inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline-danger btn-sm">تسجيل الخروج</button>
                 </form>
             {% else %}
-                <a href="{% url 'welcome' %}" class="btn btn-outline-light btn-sm me-2">الرئيسية</a>
-                <a href="{% url 'parent_inquiry' %}" class="btn btn-outline-info btn-sm me-2">استعلام أولياء الأمور</a>
-                <a href="{% url 'login' %}" class="btn btn-outline-success btn-sm">تسجيل الدخول</a>
+                <!-- <a href="{% url 'login' %}" class="btn btn-outline-light">تسجيل دخول المعلمين</a> -->
             {% endif %}
         </div>
     </div>
