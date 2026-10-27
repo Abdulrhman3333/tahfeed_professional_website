@@ -426,6 +426,7 @@
         }
 
         .pdf-header {
+            position: relative;
             text-align: center;
             margin-bottom: 4px;
             padding: 6px 8px 4px;
@@ -433,6 +434,15 @@
             position: relative;
             background: white;
             border-radius: 0;
+        }
+
+        .pdf-qr-code {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 24mm;
+            height: 24mm;
+            object-fit: contain;
         }
 
         .pdf-header-logo {

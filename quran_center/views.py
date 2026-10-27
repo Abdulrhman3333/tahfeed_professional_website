@@ -2,7 +2,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
 from django.conf import settings
-from .forms import StudentRegistrationForm, StudentBulkUploadForm, MemorizationTemplateUploadForm
+from .forms import (
+    StudentRegistrationForm,
+    StudentBulkUploadForm,
+    MemorizationTemplateUploadForm,
+    AttendanceReportDateRangeForm,
+)
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.views import LoginView
 from .models import Student, Attendance, TeacherAttendance, StageSupervisor, AcademicCalendar, ExamNomination, UserRole, TeacherPlanPreference, SmsTemplateSetting, MemorizationTemplateBundle, TeacherProfile
@@ -2166,7 +2171,9 @@ def is_admin(user):
 @user_passes_test(is_admin)
 def admin_dashboard(request):
     # كود لوحة التحكم الشاملة
-    return render(request, 'admin_view.html')
+    return render(request, 'admin_view.html', {
+        'attendance_report_form': AttendanceReportDateRangeForm(),
+    })
 
 
 @login_required
@@ -2222,6 +2229,132 @@ def export_student_data(request):
     response['Content-Disposition'] = 'attachment; filename="student_data.xlsx"'
     workbook.save(response)
     return response
+
+
+def _attendance_report_date_range(request):
+    form = AttendanceReportDateRangeForm(request.GET)
+    if not form.is_valid():
+        return None, form
+    return (form.cleaned_data['start_date'], form.cleaned_data['end_date']), form
+
+
+def _write_excel_response(workbook, filename):
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    workbook.save(response)
+    return response
+
+
+def _attendance_counts(attendance_queryset):
+    counts = {
+        'غائب': 0,
+        'غياب بعذر': 0,
+        'متأخر': 0,
+        'all': 0,
+    }
+    for status in attendance_queryset.values_list('status', flat=True):
+        counts['all'] += 1
+        if status in counts:
+            counts[status] += 1
+    counts['absence_total'] = counts['غائب'] + counts['غياب بعذر']
+    return counts
+
+
+@login_required
+@user_passes_test(is_admin)
+def export_student_absence_report(request):
+    date_range, form = _attendance_report_date_range(request)
+    if not date_range:
+        return HttpResponse(
+            'يرجى اختيار فترة زمنية صحيحة: ' + ' '.join(form.errors.get_json_data().keys()),
+            status=400,
+            content_type='text/plain; charset=utf-8',
+        )
+
+    start_date, end_date = date_range
+    students = Student.objects.select_related('teacher').order_by('full_name', 'id')
+    attendance = Attendance.objects.filter(date__range=(start_date, end_date))
+    headers = [
+        'اسم الطالب', 'عدد أيام الغياب', 'الغياب', 'الغياب بعذر', 'التأخير',
+        'جميع الحالات', 'رقم الهوية', 'جوال ولي الأمر', 'جوال الطالب',
+        'اسم المعلم', 'الصف', 'المرحلة',
+    ]
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'غياب الطلاب'
+    worksheet.sheet_view.rightToLeft = True
+    worksheet.append(headers)
+
+    for student in students:
+        counts = _attendance_counts(attendance.filter(student=student))
+        teacher_name = ''
+        if student.teacher:
+            teacher_name = student.teacher.get_full_name() or student.teacher.username
+        worksheet.append([
+            student.full_name,
+            counts['absence_total'],
+            counts['غائب'],
+            counts['غياب بعذر'],
+            counts['متأخر'],
+            counts['all'],
+            student.identity_number or '',
+            student.parent_phone or '',
+            student.student_phone or '',
+            teacher_name,
+            student.get_grade_display(),
+            student.educational_stage or '',
+        ])
+
+    worksheet.freeze_panes = 'A2'
+    return _write_excel_response(workbook, 'student_absence_report.xlsx')
+
+
+@login_required
+@user_passes_test(is_admin)
+def export_teacher_absence_report(request):
+    date_range, form = _attendance_report_date_range(request)
+    if not date_range:
+        return HttpResponse(
+            'يرجى اختيار فترة زمنية صحيحة: ' + ' '.join(form.errors.get_json_data().keys()),
+            status=400,
+            content_type='text/plain; charset=utf-8',
+        )
+
+    start_date, end_date = date_range
+    teachers = User.objects.filter(
+        Q(student__isnull=False) | Q(teacherattendance__isnull=False)
+    ).distinct().order_by('username')
+    attendance = TeacherAttendance.objects.filter(date__range=(start_date, end_date))
+    headers = [
+        'اسم المعلم', 'عدد أيام الغياب', 'الغياب', 'الغياب بعذر',
+        'التأخير', 'جميع الحالات', 'المرحلة',
+    ]
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'غياب المعلمين'
+    worksheet.sheet_view.rightToLeft = True
+    worksheet.append(headers)
+
+    for teacher in teachers:
+        counts = _attendance_counts(attendance.filter(teacher=teacher))
+        stages = Student.objects.filter(teacher=teacher).values_list(
+            'educational_stage', flat=True
+        ).distinct()
+        stage_names = '، '.join(sorted(stage for stage in stages if stage))
+        worksheet.append([
+            teacher.get_full_name() or teacher.username,
+            counts['absence_total'],
+            counts['غائب'],
+            counts['غياب بعذر'],
+            counts['متأخر'],
+            counts['all'],
+            stage_names,
+        ])
+
+    worksheet.freeze_panes = 'A2'
+    return _write_excel_response(workbook, 'teacher_absence_report.xlsx')
 
 @login_required
 @user_passes_test(is_admin)
