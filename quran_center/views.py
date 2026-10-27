@@ -2163,9 +2163,13 @@ def preparer_absent_contacts(request):
     }
     return render(request, 'preparer_absent_contacts.html', context)
 
-# 1. للمدير فقط: لا يدخل إلا من لديه صلاحيات Superuser
+# 1. للمدير والمحضّر: الوصول إلى لوحة التقارير والإدارة اليومية
 def is_admin(user):
-    return user.is_superuser or user_has_role(user, 'manager')
+    return (
+        user.is_superuser
+        or user_has_role(user, 'manager')
+        or user_has_role(user, 'preparer')
+    )
 
 @login_required
 @user_passes_test(is_admin)
