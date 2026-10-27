@@ -20,6 +20,11 @@
         const plannerQueryParams = new URLSearchParams(window.location.search);
         const isSingleStudentContext = plannerQueryParams.get('single') === '1';
         const canImportTemplates = plannerQueryParams.get('can_import') === '1';
+        const plannerTeacherName = (
+            typeof TEACHER_NAME !== 'undefined'
+                ? TEACHER_NAME
+                : plannerQueryParams.get('teacher_name') || ''
+        ).trim();
         let TEMPLATE_DEFINITIONS = DEFAULT_TEMPLATE_DEFINITIONS.map(item => ({ ...item }));
 
         // Initialize form when page loads
@@ -1586,8 +1591,9 @@
                     <div class="pdf-page">
                         <div class="pdf-header">
                             <img src="${PDF_LOGO_URL}" alt="الشعار" class="pdf-header-logo">
+                            <img src="" alt="بيانات الخطة QR" class="pdf-qr-code">
                             <h1>الــخــطــة الــقــرآنــيــة</h1>
-                            <p style="font-size: 1.1rem; margin-top: 1px; text-align: right; direction: rtl;"><strong>اسم الطالب:</strong> ${plan.studentName}&nbsp;&nbsp; | &nbsp;&nbsp;<strong>رقم الطالب:</strong> ${plan.studentId}</p>
+                            <p style="font-size: 1.1rem; margin-top: 1px; text-align: right; direction: rtl;"><strong>اسم الطالب:</strong> ${plan.studentName}</p>
                             <p style="font-size: 1rem; text-align: right; direction: rtl;"><strong>خطة الحفظ:</strong> ${planName}${minorReviewText}&nbsp;&nbsp; | &nbsp;&nbsp;<strong>المراجعة الكبرى:</strong> ${plan.bigReviewPages} صفحات يومياً</p>
                         </div>
 
@@ -1691,6 +1697,26 @@
                     pdfContainer.innerHTML = html;
                     pdfContainer.style.display = 'block';
                     pdfContainer.style.visibility = 'visible';
+
+                    const qrImage = pdfContainer.querySelector('.pdf-qr-code');
+                    if (!qrImage || !window.QRCode || typeof window.QRCode.toDataURL !== 'function') {
+                        throw new Error('تعذر تحميل مكتبة QR Code. يرجى التحقق من الاتصال ثم المحاولة مرة أخرى.');
+                    }
+                    const planData = currentPlan || {};
+                    const qrPayload = {
+                        student_name: planData.studentName || row.dataset.studentName || '',
+                        student_id: planData.studentId || row.dataset.studentId || '',
+                        teacher_name: plannerTeacherName,
+                        memorization_template: planValueToLabel(planData.memPlan),
+                        memorization_pages: planData.memPlan === 'none' ? 0 : Number(planData.memPlan) || 0,
+                        minor_review_pages: Number(planData.minorReviewPages) || 0,
+                        major_review_pages: Number(planData.bigReviewPages) || 0
+                    };
+                    qrImage.src = await window.QRCode.toDataURL(JSON.stringify(qrPayload), {
+                        errorCorrectionLevel: 'M',
+                        margin: 1,
+                        width: 180
+                    });
 
                     // Reduced wait time for better performance
                     await new Promise(resolve => setTimeout(resolve, 200));

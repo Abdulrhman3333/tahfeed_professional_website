@@ -4,13 +4,13 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from openpyxl import load_workbook
 
-from .models import Role, Student, UserRole
+from .models import Attendance, Role, Student, TeacherAttendance, UserRole
 
 
 class StudentDataExportTests(TestCase):
     def setUp(self):
         self.manager = User.objects.create_user(username='manager', password='password')
-        manager_role = Role.objects.create(code='manager', name='المدير')
+        manager_role, _ = Role.objects.get_or_create(code='manager', defaults={'name': 'المدير'})
         UserRole.objects.create(user=self.manager, role=manager_role)
         self.teacher = User.objects.create_user(
             username='teacher', password='password', first_name='معلم', last_name='مسؤول'
@@ -89,12 +89,110 @@ class StudentDataExportTests(TestCase):
         self.assertIn('/login/', response['Location'])
 
 
+class AttendanceReportExportTests(TestCase):
+    def setUp(self):
+        self.manager = User.objects.create_user(username='manager', password='password')
+        manager_role, _ = Role.objects.get_or_create(code='manager', defaults={'name': 'المدير'})
+        UserRole.objects.create(user=self.manager, role=manager_role)
+        self.teacher = User.objects.create_user(
+            username='teacher', password='password', first_name='معلم', last_name='مسؤول'
+        )
+        self.student = Student.objects.create(
+            full_name='طالب التقرير',
+            student_phone='0500000000',
+            parent_phone='0550000000',
+            identity_number='1111111111',
+            grade='1_pri',
+            teacher=self.teacher,
+        )
+        Attendance.objects.create(
+            student=self.student,
+            date='2026-01-05',
+            weekday='الاثنين',
+            week_number=1,
+            status='غائب',
+        )
+        Attendance.objects.create(
+            student=self.student,
+            date='2026-01-06',
+            weekday='الثلاثاء',
+            week_number=1,
+            status='غياب بعذر',
+        )
+        Attendance.objects.create(
+            student=self.student,
+            date='2026-01-07',
+            weekday='الأربعاء',
+            week_number=1,
+            status='متأخر',
+        )
+        Attendance.objects.create(
+            student=self.student,
+            date='2026-02-01',
+            weekday='الأحد',
+            week_number=4,
+            status='غائب',
+        )
+        TeacherAttendance.objects.create(
+            teacher=self.teacher,
+            date='2026-01-05',
+            weekday='الاثنين',
+            week_number=1,
+            status='غياب بعذر',
+        )
+
+    def test_student_report_uses_date_range_and_has_status_columns(self):
+        self.client.force_login(self.manager)
+        response = self.client.get(
+            '/admin-dashboard/export-student-absence/',
+            {'start_date': '2026-01-01', 'end_date': '2026-01-31'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        worksheet = load_workbook(BytesIO(response.content), data_only=False).active
+        self.assertEqual(
+            [cell.value for cell in worksheet[1]],
+            [
+                'اسم الطالب', 'عدد أيام الغياب', 'الغياب', 'الغياب بعذر',
+                'التأخير', 'جميع الحالات', 'رقم الهوية', 'جوال ولي الأمر',
+                'جوال الطالب', 'اسم المعلم', 'الصف', 'المرحلة',
+            ],
+        )
+        self.assertEqual([cell.value for cell in worksheet[2]][:6], [
+            'طالب التقرير', 2, 1, 1, 1, 3,
+        ])
+
+    def test_teacher_report_has_stage_and_status_columns(self):
+        self.client.force_login(self.manager)
+        response = self.client.get(
+            '/admin-dashboard/export-teacher-absence/',
+            {'start_date': '2026-01-01', 'end_date': '2026-01-31'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        worksheet = load_workbook(BytesIO(response.content), data_only=False).active
+        self.assertEqual([cell.value for cell in worksheet[1]], [
+            'اسم المعلم', 'عدد أيام الغياب', 'الغياب', 'الغياب بعذر',
+            'التأخير', 'جميع الحالات', 'المرحلة',
+        ])
+        self.assertEqual([cell.value for cell in worksheet[2]], [
+            'معلم مسؤول', 1, 0, 1, 0, 1, 'مبكرة',
+        ])
+
+    def test_reports_require_a_valid_date_range(self):
+        self.client.force_login(self.manager)
+
+        response = self.client.get('/admin-dashboard/export-student-absence/')
+
+        self.assertEqual(response.status_code, 400)
+
+
 class PreparerAttendanceAccessTests(TestCase):
     def setUp(self):
         self.supervisor = User.objects.create_user(username='supervisor', password='password')
         self.preparer = User.objects.create_user(username='preparer', password='password')
-        supervisor_role = Role.objects.create(code='supervisor', name='المشرف')
-        preparer_role = Role.objects.create(code='preparer', name='المحضّر')
+        supervisor_role, _ = Role.objects.get_or_create(code='supervisor', defaults={'name': 'المشرف'})
+        preparer_role, _ = Role.objects.get_or_create(code='preparer', defaults={'name': 'المحضّر'})
         UserRole.objects.create(user=self.supervisor, role=supervisor_role)
         UserRole.objects.create(user=self.preparer, role=preparer_role)
 
