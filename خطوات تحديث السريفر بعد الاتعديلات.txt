@@ -1,16 +1,6 @@
-# 2. سحب أحدث التحديثات من GitHub (تأكد من اسم الفرع main أو master)
+cd /home/Alhomoody/اسم_مجلد_المشروع
 git pull origin main
-
-# 3. تفعيل بيئة العمل الافتراضية (Virtual Environment)
 source ~/.virtualenvs/اسم_بيئة_العمل/bin/activate
-
-# 4. تثبيت أي مكتبات أو حزم جديدة تم إضافتها للمشروع (اختياري)
 pip install -r requirements.txt
-
-# 5. تطبيق التعديلات على قاعدة البيانات
 python manage.py migrate
-
-# 6. تجميع وتحديث الملفات الثابتة مثل CSS و JS والصور
 python manage.py collectstatic --noinput
-
-# ملاحظة أخيره: بعد تشغيل الأوامر أعلاه، انتقل إلى تبويب Web في PythonAnywhere واضغط على زر Reload ليعمل التحديث على الموقع.

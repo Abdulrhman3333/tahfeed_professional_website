@@ -75,6 +75,7 @@
             <a href="{% url 'preparer_take_attendance' %}" class="mobile-nav-link">تحضير المعلمين</a>
             <a href="{% url 'preparer_take_students_attendance' %}" class="mobile-nav-link">تحضير جميع الطلاب</a>
             <a href="{% url 'preparer_attendance_summary' %}" class="mobile-nav-link">متابعة التحضير</a>
+            <a href="{% url 'admin_dashboard' %}" class="mobile-nav-link">لوحة المدير</a>
             {% if user|has_role:"preparer" %}
             <a href="{% url 'preparer_absent_contacts' %}" class="mobile-nav-link">أرقام الغياب</a>
             {% endif %}
@@ -142,6 +143,7 @@
                 <a href="{% url 'preparer_take_attendance' %}" class="btn btn-outline-success btn-sm me-2">تحضير المعلمين</a>
                 <a href="{% url 'preparer_take_students_attendance' %}" class="btn btn-outline-success btn-sm me-2">تحضير جميع الطلاب</a>
                 <a href="{% url 'preparer_attendance_summary' %}" class="btn btn-outline-success btn-sm me-2">متابعة التحضير</a>
+                <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-success btn-sm me-2">لوحة المدير</a>
                 {% if user|has_role:"preparer" %}
                 <a href="{% url 'preparer_absent_contacts' %}" class="btn btn-outline-success btn-sm me-2">أرقام الغياب</a>
                 {% endif %}
@@ -155,6 +157,7 @@
                 {% endif %}
                 <a href="{% url 'admin:index' %}" class="btn btn-outline-warning btn-sm me-2">لوحة الإدارة</a>
                 <a href="{% url 'admin_statistics' %}" class="btn btn-outline-warning btn-sm me-2">الإحصائيات</a>
+                <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-warning btn-sm me-2">لوحة المدير</a>
                 {% endif %}
                 
                 <form method="post" action="{% url 'logout' %}" style="display: inline;">

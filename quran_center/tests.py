@@ -209,3 +209,10 @@ class PreparerAttendanceAccessTests(TestCase):
         response = self.client.get('/preparer-attendance/')
 
         self.assertEqual(response.status_code, 200)
+
+    def test_preparer_can_view_admin_dashboard(self):
+        self.client.force_login(self.preparer)
+
+        response = self.client.get('/admin-dashboard/')
+
+        self.assertEqual(response.status_code, 200)

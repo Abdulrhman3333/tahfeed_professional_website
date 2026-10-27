@@ -1699,7 +1699,7 @@
                     pdfContainer.style.visibility = 'visible';
 
                     const qrImage = pdfContainer.querySelector('.pdf-qr-code');
-                    if (!qrImage || !window.QRCode || typeof window.QRCode.toDataURL !== 'function') {
+                    if (!qrImage || typeof window.QRCode !== 'function') {
                         throw new Error('تعذر تحميل مكتبة QR Code. يرجى التحقق من الاتصال ثم المحاولة مرة أخرى.');
                     }
                     const planData = currentPlan || {};
@@ -1712,11 +1712,27 @@
                         minor_review_pages: Number(planData.minorReviewPages) || 0,
                         major_review_pages: Number(planData.bigReviewPages) || 0
                     };
-                    qrImage.src = await window.QRCode.toDataURL(JSON.stringify(qrPayload), {
-                        errorCorrectionLevel: 'M',
-                        margin: 1,
-                        width: 180
+                    const qrSource = document.createElement('div');
+                    qrSource.style.position = 'absolute';
+                    qrSource.style.left = '-9999px';
+                    qrSource.style.top = '0';
+                    document.body.appendChild(qrSource);
+                    new window.QRCode(qrSource, {
+                        text: JSON.stringify(qrPayload),
+                        width: 180,
+                        height: 180,
+                        correctLevel: window.QRCode.CorrectLevel.M
                     });
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    const generatedQr = qrSource.querySelector('img, canvas');
+                    if (!generatedQr) {
+                        qrSource.remove();
+                        throw new Error('تعذر إنشاء رمز QR للبيانات المحددة.');
+                    }
+                    qrImage.src = generatedQr.tagName.toLowerCase() === 'canvas'
+                        ? generatedQr.toDataURL('image/png')
+                        : generatedQr.src;
+                    qrSource.remove();
 
                     // Reduced wait time for better performance
                     await new Promise(resolve => setTimeout(resolve, 200));
