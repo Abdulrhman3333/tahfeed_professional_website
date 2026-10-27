@@ -301,6 +301,7 @@
     var PREF_MEM_PLAN = "{{ preference.mem_plan|default:'1'|escapejs }}";
     var PREF_BIG_PAGES = parseInt("{{ preference.big_review_pages|default:5 }}") || 5;
     var LOGO_URL      = "{% static 'images/logo.jpg' %}";
+    var TEACHER_NAME  = "{{ user.get_full_name|default:user.username|escapejs }}";
     var CAN_IMPORT    = {% if user|has_role:'manager' %}true{% else %}false{% endif %};
 </script>
 
@@ -308,8 +309,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="{% static 'planner/quran-data.js' %}"></script>
-<script src="{% static 'planner/app.js' %}"></script>
+<script src="{% static 'planner/app.js' %}?v=20261027"></script>
 
 {# ─── Native page controller ─── #}
 <script>

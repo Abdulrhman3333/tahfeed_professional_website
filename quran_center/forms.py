@@ -55,3 +55,24 @@ class MemorizationTemplateUploadForm(forms.Form):
         if not filename.endswith('.xlsx'):
             raise forms.ValidationError('يرجى رفع ملف Excel بصيغة .xlsx فقط.')
         return excel_file
+
+
+class AttendanceReportDateRangeForm(forms.Form):
+    start_date = forms.DateField(
+        label='من تاريخ',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}, format='%Y-%m-%d'),
+        input_formats=['%Y-%m-%d'],
+    )
+    end_date = forms.DateField(
+        label='إلى تاريخ',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}, format='%Y-%m-%d'),
+        input_formats=['%Y-%m-%d'],
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+        if start_date and end_date and start_date > end_date:
+            raise forms.ValidationError('يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له.')
+        return cleaned_data
