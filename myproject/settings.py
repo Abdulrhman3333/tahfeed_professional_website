@@ -12,14 +12,29 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def load_env_file(path):
+    """Load simple KEY=VALUE entries without external dependencies."""
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
 # Load server-side environment values from .env. Process environment variables
 # remain authoritative if both sources define the same setting.
-load_dotenv(BASE_DIR / '.env')
+load_env_file(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
