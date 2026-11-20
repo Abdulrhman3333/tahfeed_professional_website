@@ -1,10 +1,60 @@
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from openpyxl import load_workbook
 
 from .models import Attendance, Role, Student, TeacherAttendance, UserRole
+from .views import render_message_template
+
+
+class AutomaticAttendanceSmsTests(TestCase):
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username='attendance_teacher',
+            password='password',
+            first_name='أحمد',
+            last_name='المعلم',
+        )
+        self.student = Student.objects.create(
+            full_name='محمد علي',
+            parent_phone='0551234567',
+            identity_number='123456789',
+            grade='1_pri',
+            teacher=self.teacher,
+            status='منتظم',
+        )
+
+    @patch('quran_center.views.send_batch_messages')
+    def test_take_attendance_sends_absence_template_once_for_status_change(self, send_batch):
+        send_batch.return_value = {
+            'success_count': 1,
+            'failed_count': 0,
+            'failures': [],
+        }
+        self.client.force_login(self.teacher)
+
+        response = self.client.post('/attendance/', {
+            'attendance_date': '2026-11-20',
+            'status_{}'.format(self.student.id): 'غائب',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        send_batch.assert_called_once()
+        rows, template = send_batch.call_args.args
+        self.assertEqual(rows[0]['phone_number'], '966551234567')
+        rendered = render_message_template(template, rows[0])
+        self.assertIn('نفيدكم بغياب الابن محمد', rendered)
+        self.assertIn('اليوم الجمعة', rendered)
+        self.assertIn('جامع الحمودي', rendered)
+
+        send_batch.reset_mock()
+        self.client.post('/attendance/', {
+            'attendance_date': '2026-11-20',
+            'status_{}'.format(self.student.id): 'غائب',
+        })
+        send_batch.assert_not_called()
 
 
 class StudentDataExportTests(TestCase):
@@ -207,6 +257,13 @@ class PreparerAttendanceAccessTests(TestCase):
         self.client.force_login(self.preparer)
 
         response = self.client.get('/preparer-attendance/')
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_supervisor_can_take_other_teachers_students_attendance(self):
+        self.client.force_login(self.supervisor)
+
+        response = self.client.get('/preparer-attendance/students/')
 
         self.assertEqual(response.status_code, 200)
 

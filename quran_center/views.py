@@ -91,6 +91,19 @@ def can_access_preparer_attendance(user):
     return user_has_role(user, 'preparer')
 
 
+def can_take_other_teachers_attendance(user):
+    """السماح للمحضّر أو المشرف بتحضير طلاب المعلمين."""
+    return (
+        user.is_authenticated
+        and (
+            user.is_superuser
+            or user_has_role(user, 'preparer')
+            or user_has_role(user, 'supervisor')
+            or hasattr(user, 'stage_supervisor')
+        )
+    )
+
+
 ARABIC_WEEKDAY_NAMES = {
     # Python's date.weekday() starts from Monday=0 to Sunday=6.
     0: 'الاثنين',
@@ -541,6 +554,45 @@ def render_message_template(template_text, row_data):
     return rendered.strip()
 
 
+def get_sms_provider_credits():
+    """Return the remaining SMS credits from the configured provider."""
+    api_url = getattr(settings, 'SMS_BALANCE_URL', '').strip()
+    api_key = getattr(settings, 'SMS_API_KEY', '').strip()
+    if not api_url:
+        return None, 'SMS balance URL is not configured.'
+    if not api_key:
+        return None, 'SMS API key is not configured.'
+
+    auth_header = getattr(settings, 'SMS_AUTH_HEADER', 'Authorization')
+    auth_scheme = getattr(settings, 'SMS_AUTH_SCHEME', 'Bearer').strip()
+    auth_value = f'{auth_scheme} {api_key}' if auth_scheme else api_key
+    req = urlrequest.Request(
+        api_url,
+        headers={
+            'Accept': 'application/json',
+            auth_header: auth_value,
+        },
+        method='GET',
+    )
+
+    try:
+        timeout = int(getattr(settings, 'SMS_API_TIMEOUT', 15))
+        with urlrequest.urlopen(req, timeout=timeout) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+        credits = payload.get('credits') if isinstance(payload, dict) else None
+        if credits is None:
+            return None, 'The provider did not return a credits value.'
+        return credits, None
+    except HTTPError as exc:
+        return None, f'HTTP {exc.code}'
+    except URLError as exc:
+        return None, f'URL error: {exc.reason}'
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        return None, f'Invalid provider response: {exc}'
+    except Exception as exc:
+        return None, str(exc)
+
+
 def send_sms_via_api(phone_number, message_text):
     """Send one SMS using a configurable JSON API endpoint."""
     api_url = getattr(settings, 'SMS_API_URL', '').strip()
@@ -628,6 +680,51 @@ def send_batch_messages(rows, template_text):
         'failed_count': failed_count,
         'failures': failures[:5],
     }
+
+
+def build_attendance_sms_rows(students, target_date, status_code):
+    """Build template rows for one attendance status."""
+    rows = []
+    for student in students:
+        full_name = student.full_name or ''
+        first_name = full_name.split()[0] if full_name.split() else ''
+        teacher = student.teacher
+        teacher_name = ''
+        teacher_phone = ''
+
+        if teacher:
+            teacher_name = teacher.get_full_name() or teacher.username or ''
+            profile = getattr(teacher, 'teacher_profile', None)
+            teacher_phone = normalize_saudi_phone(getattr(profile, 'phone', '')) if profile else ''
+
+        rows.append({
+            'phone_number': normalize_saudi_phone(student.parent_phone),
+            'first_name': first_name,
+            'full_name': full_name,
+            'teacher_name': teacher_name,
+            'teacher_phone': teacher_phone,
+            'total_days': Attendance.objects.filter(student=student, status=status_code).count(),
+            'today_date': target_date,
+            'today_day_name': get_arabic_weekday_name(target_date),
+        })
+
+    return merge_sibling_rows(rows)
+
+
+def get_attendance_sms_templates(user):
+    """Get teacher attendance templates, with the required center defaults."""
+    defaults = {
+        'absent': 'نفيدكم بغياب الابن {{{الاسم_الأول}}} اليوم {{{اليوم}}}.\nللتواصل مع المعلم {{{اسم_المعلم}}} - {{{جوال_المعلم}}}.\nجامع الحمودي',
+        'absent_excused': 'نفيدكم بغياب الابن {{{الاسم_الأول}}} اليوم {{{اليوم}}} بعذر.\nللتواصل مع المعلم {{{اسم_المعلم}}} - {{{جوال_المعلم}}}.\nجامع الحمودي',
+        'late': 'نفيدكم بـتأخر الابن {{{الاسم_الأول}}} اليوم {{{اليوم}}}\nللتواصل مع المعلم {{{اسم_المعلم}}} - {{{جوال_المعلم}}}.\nجامع الحمودي',
+        'excused': 'نفيدكم بانصراف الابن {{{الاسم_الأول}}} اليوم {{{اليوم}}} قبل انتهاء موعد الحلقة، بعذر.\nللتواصل مع المعلم {{{اسم_المعلم}}} - {{{جوال_المعلم}}}.\nجامع الحمودي',
+    }
+    saved_templates = {
+        row.section: row.template_text
+        for row in SmsTemplateSetting.objects.filter(user=user)
+        if row.section in defaults
+    }
+    return {section: saved_templates.get(section, template) for section, template in defaults.items()}
 
 
 def send_whatsapp_batch(messages):
@@ -876,6 +973,7 @@ def take_attendance(request):
     current_week = AcademicCalendar.get_week_from_date(selected_date)
     
     success = False
+    sms_feedback = None
     if request.method == 'POST':
         posted_date_str = request.POST.get('attendance_date', str(selected_date))
         try:
@@ -885,10 +983,22 @@ def take_attendance(request):
 
         selected_weekday = get_arabic_weekday_name(posted_date)
         selected_week = AcademicCalendar.get_week_from_date(posted_date)
+
+        status_changes = {
+            'غائب': [],
+            'غياب بعذر': [],
+            'متأخر': [],
+            'مستأذن': [],
+        }
         
         for student in students:
             status = request.POST.get(f'status_{student.id}')
             if status:
+                previous_attendance = Attendance.objects.filter(
+                    student=student,
+                    date=posted_date,
+                ).first()
+                previous_status = previous_attendance.status if previous_attendance else None
                 Attendance.objects.update_or_create(
                     student=student,
                     date=posted_date,
@@ -898,6 +1008,33 @@ def take_attendance(request):
                         'week_number': selected_week
                     }
                 )
+                if status != previous_status and status in status_changes:
+                    status_changes[status].append(student)
+
+        section_map = {
+            'غائب': ('absent', 'غياب'),
+            'غياب بعذر': ('absent_excused', 'غياب بعذر'),
+            'متأخر': ('late', 'تأخر'),
+            'مستأذن': ('excused', 'انصراف'),
+        }
+        templates = get_attendance_sms_templates(request.user)
+        sms_results = []
+        for status_code, (section, label) in section_map.items():
+            changed_students = status_changes[status_code]
+            if not changed_students:
+                continue
+            rows = build_attendance_sms_rows(changed_students, posted_date, status_code)
+            result = send_batch_messages(rows, templates[section])
+            sms_results.append({
+                'label': label,
+                'success_count': result['success_count'],
+                'failed_count': result['failed_count'],
+                'failures': result['failures'],
+            })
+
+        if sms_results:
+            sms_feedback = sms_results
+
         # بدل redirect، نعيد تحميل البيانات وإظهار رسالة نجاح
         success = True
         selected_date = posted_date
@@ -924,6 +1061,7 @@ def take_attendance(request):
         'today': today,
         'attendance_map': attendance_map,
         'success': success,
+        'sms_feedback': sms_feedback,
     }
     
     return render(request, 'attendance.html', context)
@@ -1883,8 +2021,8 @@ def preparer_take_attendance(request):
 
 @login_required
 def preparer_take_students_attendance(request):
-    """تحضير طلاب أي معلم - للمحضّر فقط"""
-    if not can_access_preparer_attendance(request.user):
+    """تحضير طلاب أي معلم للمحضّر والمشرف."""
+    if not can_take_other_teachers_attendance(request.user):
         return redirect('home')
 
     teachers = User.objects.filter(student__status='منتظم').distinct().order_by('username')
@@ -1992,6 +2130,8 @@ def preparer_absent_contacts(request):
     if not user_has_role(request.user, 'preparer'):
         return redirect('home')
 
+    sms_credits, sms_credits_error = get_sms_provider_credits()
+
     target_date_str = request.GET.get('date') or request.POST.get('date') or str(timezone.now().date())
     download_type = request.GET.get('download')
     try:
@@ -2089,19 +2229,6 @@ def preparer_absent_contacts(request):
         'excused': build_status_export_rows(target_date, 'مستأذن'),
     }
 
-    sms_feedback = None
-    if request.method == 'POST':
-        sms_action = request.POST.get('sms_action')
-        if sms_action in status_rows and request.POST.get('save_templates') != '1':
-            merged_rows = merge_sibling_rows(status_rows[sms_action])
-            batch_result = send_batch_messages(merged_rows, current_templates[sms_action])
-            sms_feedback = {
-                'section': sms_action,
-                'success_count': batch_result['success_count'],
-                'failed_count': batch_result['failed_count'],
-                'failures': batch_result['failures'],
-            }
-
     if download_type in {'absent', 'absent_excused', 'late', 'excused'}:
         status_map = {
             'absent': ('غائب', 'غياب'),
@@ -2157,9 +2284,10 @@ def preparer_absent_contacts(request):
         'absent_excused_sms_template': current_templates['absent_excused'],
         'late_sms_template': current_templates['late'],
         'excused_sms_template': current_templates['excused'],
-        'sms_feedback': sms_feedback,
         'template_save_feedback': template_save_feedback,
         'at_risk': at_risk,
+        'sms_credits': sms_credits,
+        'sms_credits_error': sms_credits_error,
     }
     return render(request, 'preparer_absent_contacts.html', context)
 
