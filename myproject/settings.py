@@ -149,6 +149,7 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 # SMS API configuration (set these in environment variables on the server).
 SMS_API_URL = os.getenv('SMS_API_URL', 'https://api.oursms.com/msgs/sms')
+SMS_BALANCE_URL = os.getenv('SMS_BALANCE_URL', 'https://api.oursms.com/billing/credits')
 SMS_API_KEY = os.getenv('SMS_API_KEY', '')
 SMS_SENDER_ID = os.getenv('SMS_SENDER_ID', '')
 SMS_API_TIMEOUT = int(os.getenv('SMS_API_TIMEOUT', '15'))

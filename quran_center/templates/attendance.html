@@ -18,6 +18,16 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     {% endif %}
+    {% if sms_feedback %}
+    {% for result in sms_feedback %}
+    <div class="alert {% if result.failed_count == 0 %}alert-success{% else %}alert-warning{% endif %}">
+        تم إرسال رسائل {{ result.label }}: نجح {{ result.success_count }} وفشل {{ result.failed_count }}.
+        {% if result.failures %}
+        <br>أول الأخطاء: {{ result.failures|join:' | ' }}
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
     {% if students_with_status %}
     <form method="post">
         {% csrf_token %}

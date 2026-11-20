@@ -81,6 +81,10 @@
             {% endif %}
             {% endif %}
 
+            {% if user.stage_supervisor or user|has_role:"supervisor" %}
+            <a href="{% url 'preparer_take_students_attendance' %}" class="mobile-nav-link">تحضير طلاب المعلمين</a>
+            {% endif %}
+
             {% if user.is_superuser or user|has_role:"manager" %}
             <a href="{% url 'bulk_students_upload' %}" class="mobile-nav-link">رفع طلاب Excel</a>
             {% if user.is_superuser %}
@@ -147,6 +151,10 @@
                 {% if user|has_role:"preparer" %}
                 <a href="{% url 'preparer_absent_contacts' %}" class="btn btn-outline-success btn-sm me-2">أرقام الغياب</a>
                 {% endif %}
+                {% endif %}
+
+                {% if user.stage_supervisor or user|has_role:"supervisor" %}
+                <a href="{% url 'preparer_take_students_attendance' %}" class="btn btn-outline-success btn-sm me-2">تحضير طلاب المعلمين</a>
                 {% endif %}
                 
                 <!-- روابط المدير -->
