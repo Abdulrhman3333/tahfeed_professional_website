@@ -2036,14 +2036,7 @@ def preparer_take_students_attendance(request):
     except ValueError:
         selected_date = today
 
-    weekday_map = {
-        6: 'الأحد',
-        0: 'الاثنين',
-        1: 'الثلاثاء',
-        2: 'الأربعاء',
-        3: 'الخميس',
-    }
-    current_weekday = weekday_map.get(selected_date.weekday(), 'الأحد')
+    current_weekday = get_arabic_weekday_name(selected_date)
     current_week = AcademicCalendar.get_week_from_date(selected_date)
 
     selected_teacher = None
@@ -2058,6 +2051,7 @@ def preparer_take_students_attendance(request):
 
     success = False
     error_message = None
+    sms_feedback = None
 
     if request.method == 'POST':
         posted_date_str = request.POST.get('attendance_date', str(selected_date))
@@ -2066,15 +2060,27 @@ def preparer_take_students_attendance(request):
         except ValueError:
             posted_date = selected_date
 
-        selected_weekday = weekday_map.get(posted_date.weekday(), 'الأحد')
+        selected_weekday = get_arabic_weekday_name(posted_date)
         selected_week = AcademicCalendar.get_week_from_date(posted_date)
 
         if not selected_teacher:
             error_message = 'يرجى اختيار المعلم أولاً.'
         else:
+            status_changes = {
+                'غائب': [],
+                'غياب بعذر': [],
+                'متأخر': [],
+                'مستأذن': [],
+            }
+
             for student in students:
                 status = request.POST.get(f'status_{student.id}')
                 if status:
+                    previous_attendance = Attendance.objects.filter(
+                        student=student,
+                        date=posted_date,
+                    ).first()
+                    previous_status = previous_attendance.status if previous_attendance else None
                     Attendance.objects.update_or_create(
                         student=student,
                         date=posted_date,
@@ -2084,6 +2090,32 @@ def preparer_take_students_attendance(request):
                             'week_number': selected_week,
                         }
                     )
+                    if status != previous_status and status in status_changes:
+                        status_changes[status].append(student)
+
+            section_map = {
+                'غائب': ('absent', 'غياب'),
+                'غياب بعذر': ('absent_excused', 'غياب بعذر'),
+                'متأخر': ('late', 'تأخر'),
+                'مستأذن': ('excused', 'انصراف'),
+            }
+            templates = get_attendance_sms_templates(request.user)
+            sms_results = []
+            for status_code, (section, label) in section_map.items():
+                changed_students = status_changes[status_code]
+                if not changed_students:
+                    continue
+                rows = build_attendance_sms_rows(changed_students, posted_date, status_code)
+                result = send_batch_messages(rows, templates[section])
+                sms_results.append({
+                    'label': label,
+                    'success_count': result['success_count'],
+                    'failed_count': result['failed_count'],
+                    'failures': result['failures'],
+                })
+
+            if sms_results:
+                sms_feedback = sms_results
 
             success = True
             selected_date = posted_date
@@ -2120,6 +2152,7 @@ def preparer_take_students_attendance(request):
         'current_week': current_week,
         'success': success,
         'error_message': error_message,
+        'sms_feedback': sms_feedback,
     }
     return render(request, 'preparer_take_students_attendance.html', context)
 

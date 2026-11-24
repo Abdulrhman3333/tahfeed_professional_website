@@ -56,6 +56,41 @@ class AutomaticAttendanceSmsTests(TestCase):
         })
         send_batch.assert_not_called()
 
+    @patch('quran_center.views.send_batch_messages')
+    def test_preparer_take_students_attendance_sends_sms_once_for_status_change(self, send_batch):
+        send_batch.return_value = {
+            'success_count': 1,
+            'failed_count': 0,
+            'failures': [],
+        }
+        preparer = User.objects.create_user(username='preparer_user', password='password')
+        preparer_role, _ = Role.objects.get_or_create(code='preparer', defaults={'name': 'المحضّر'})
+        UserRole.objects.create(user=preparer, role=preparer_role)
+        self.client.force_login(preparer)
+
+        response = self.client.post('/preparer-attendance/students/', {
+            'attendance_date': '2026-11-20',
+            'teacher_id': self.teacher.id,
+            'status_{}'.format(self.student.id): 'غائب',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        send_batch.assert_called_once()
+        rows, template = send_batch.call_args.args
+        self.assertEqual(rows[0]['phone_number'], '966551234567')
+        rendered = render_message_template(template, rows[0])
+        self.assertIn('نفيدكم بغياب الابن محمد', rendered)
+        self.assertIn('اليوم الجمعة', rendered)
+        self.assertIn('جامع الحمودي', rendered)
+
+        send_batch.reset_mock()
+        self.client.post('/preparer-attendance/students/', {
+            'attendance_date': '2026-11-20',
+            'teacher_id': self.teacher.id,
+            'status_{}'.format(self.student.id): 'غائب',
+        })
+        send_batch.assert_not_called()
+
 
 class StudentDataExportTests(TestCase):
     def setUp(self):

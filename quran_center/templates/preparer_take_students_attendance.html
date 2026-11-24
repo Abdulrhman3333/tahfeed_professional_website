@@ -17,6 +17,17 @@
     </div>
     {% endif %}
 
+    {% if sms_feedback %}
+    {% for result in sms_feedback %}
+    <div class="alert {% if result.failed_count == 0 %}alert-success{% else %}alert-warning{% endif %}">
+        تم إرسال رسائل {{ result.label }}: نجح {{ result.success_count }} وفشل {{ result.failed_count }}.
+        {% if result.failures %}
+        <br>أول الأخطاء: {{ result.failures|join:' | ' }}
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
     {% if error_message %}
     <div class="alert alert-danger" role="alert">
         {{ error_message }}
